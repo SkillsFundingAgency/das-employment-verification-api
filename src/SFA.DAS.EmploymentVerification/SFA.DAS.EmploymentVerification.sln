@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34408.163
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "SFA.DAS.EmploymentVerification.Database", "SFA.DAS.EmploymentVerification.Database\SFA.DAS.EmploymentVerification.Database.sqlproj", "{04F31D78-1BBA-4059-9802-25D702555814}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{04F31D78-1BBA-4059-9802-25D702555814}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AAE81D99-0892-48BF-BD03-A19ACC518090}
+	EndGlobalSection
+EndGlobal
