@@ -1,0 +1,10 @@
+CREATE TABLE [dbo].[LogETLJob]
+(
+  JobLogId INT NOT NULL Identity(1,1) Constraint PK_LogETLJob PRIMARY KEY,
+  PipelineId UNIQUEIDENTIFIER,
+  PipelineName VARCHAR(200),
+  PLStartTime DATETIME,
+  PLEndTime DATETIME,
+  CreatedOn DATETIME DEFAULT GETDATE()
+);
+GO
