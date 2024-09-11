@@ -5,6 +5,8 @@ CREATE TABLE [dbo].[LogETLCounts]
   ActivityName VARCHAR(200),
   ETLRowsAffected BIGINT,
   ETLActivityName VARCHAR(200),
-  CreatedOn DATETIME2(3) DEFAULT GETDATE()
+  CreatedOn DATETIME2(3) DEFAULT GETDATE(),
+  CONSTRAINT FK_LogETLCounts_PipelineId FOREIGN KEY (PipelineId)
+        REFERENCES dbo.LogETLJob(PipelineId)
 );
 GO

@@ -9,8 +9,10 @@ CREATE TABLE [dbo].[ScheduledEmploymentVerification]
   CommitmentStartDate DATE,
   CommitmentId BIGINT,
   AapprenticeshipId BIGINT,
-  CommitmentStatus SMALLINT,
+  CommitmentStatusId SMALLINT,
   CreatedOn DATETIME2(3) DEFAULT GETDATE(),
-  LastUpdatedOn DATETIME2(3) DEFAULT GETDATE()
+  LastUpdatedOn DATETIME2(3) DEFAULT GETDATE(),
+  CONSTRAINT FK_ScheduledEmploymentVerification_CommitmentStatusId FOREIGN KEY (CommitmentStatusId)
+        REFERENCES dbo.CommitmentStatus(CommitmentStatusId)
 );
 GO
