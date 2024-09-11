@@ -4,13 +4,13 @@
   CorrelationId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UC_EV_CorrelationId UNIQUE,
   ULN BIGINT,
   Employed BIT,
-  EmploymentCheckDate DATETIME,
-  EmploymentCheckRequestDate DATETIME,
+  EmploymentCheckDate DATETIME2(3),
+  EmploymentCheckRequestDate DATETIME2(3),
   RequestCompletionStatus SMALLINT,
   ErrorType VARCHAR(200),
-  MessageSentDate DATETIME,
+  MessageSentDate DATE,
   CheckType SMALLINT NOT NULL,
-  CreatedOn DATETIME DEFAULT GETDATE(),
-  LastUpdatedOn DATETIME DEFAULT GETDATE()
+  CreatedOn DATETIME2(3) DEFAULT GETDATE(),
+  LastUpdatedOn DATETIME2(3) DEFAULT GETDATE()
 );
 GO

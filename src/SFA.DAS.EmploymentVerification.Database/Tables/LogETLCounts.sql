@@ -5,6 +5,6 @@ CREATE TABLE [dbo].[LogETLCounts]
   ActivityName VARCHAR(200),
   ETLRowsAffected BIGINT,
   ETLActivityName VARCHAR(200),
-  CreatedOn DATETIME DEFAULT GETDATE()
+  CreatedOn DATETIME2(3) DEFAULT GETDATE()
 );
 GO

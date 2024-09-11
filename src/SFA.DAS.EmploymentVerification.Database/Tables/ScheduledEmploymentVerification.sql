@@ -4,14 +4,14 @@ CREATE TABLE [dbo].[ScheduledEmploymentVerification]
   CorrelationId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UC_Scheduled_CorrelationId UNIQUE,
   ULN BIGINT NOT NULL,
   UKPRN BIGINT,
-  EmployerAndProviderApprovedOn DATETIME,
+  EmployerAndProviderApprovedOn DATETIME2(7),
   EmployerAccountId BIGINT NOT NULL,
-  CommitmentStartDate DATETIME,
+  CommitmentStartDate DATE,
   CommitmentId BIGINT,
   AapprenticeshipId BIGINT,
   CommitmentStatus SMALLINT,
   CheckType SMALLINT,
-  CreatedOn DATETIME DEFAULT GETDATE()
+  CreatedOn DATETIME2(3) DEFAULT GETDATE()
   --LastUpdatedOn DATETIME Default getdate()
 );
 GO
