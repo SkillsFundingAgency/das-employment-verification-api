@@ -1,7 +1,7 @@
 CREATE TABLE [dbo].[ScheduledEmploymentVerification]
 (
-  ScheduledECId BIGINT NOT NULL Identity(1,1) CONSTRAINT PK_ScheduledEmploymentVerification PRIMARY KEY,
-  CorrelationId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UC_Scheduled_CorrelationId UNIQUE,
+  ScheduledEmploymentVerificationId BIGINT NOT NULL Identity(1,1) CONSTRAINT PK_ScheduledEmploymentVerification PRIMARY KEY,
+  CorrelationId UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID() CONSTRAINT UC_ScheduledEmploymentVerification_CorrelationId UNIQUE,
   ULN BIGINT NOT NULL,
   UKPRN BIGINT,
   EmployerAndProviderApprovedOn DATETIME2(7),
@@ -10,8 +10,7 @@ CREATE TABLE [dbo].[ScheduledEmploymentVerification]
   CommitmentId BIGINT,
   AapprenticeshipId BIGINT,
   CommitmentStatus SMALLINT,
-  CheckType SMALLINT,
-  CreatedOn DATETIME2(3) DEFAULT GETDATE()
-  --LastUpdatedOn DATETIME Default getdate()
+  CreatedOn DATETIME2(3) DEFAULT GETDATE(),
+  LastUpdatedOn DATETIME2(3) DEFAULT GETDATE()
 );
 GO

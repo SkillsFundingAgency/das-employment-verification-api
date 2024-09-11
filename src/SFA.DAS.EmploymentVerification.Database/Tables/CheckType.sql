@@ -1,6 +1,6 @@
 CREATE TABLE [dbo].[CheckType]
 (
-  Id INT NOT NULL Identity(1,1) Constraint PK_CheckType PRIMARY KEY,
+  CheckTypeId INT NOT NULL Identity(1,1) Constraint PK_CheckType PRIMARY KEY,
   CheckType VARCHAR(20),
   CreatedOn DATETIME2(3) DEFAULT GETDATE()
 );
