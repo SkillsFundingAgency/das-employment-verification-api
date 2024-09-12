@@ -1,7 +1,7 @@
 CREATE TABLE [dbo].[LogETLJob]
 (
   LogETLJobId INT NOT NULL Identity(1,1) Constraint PK_LogETLJob PRIMARY KEY,
-  PipelineId UNIQUEIDENTIFIER,
+  PipelineId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UC_LogETLJob_PipelineId UNIQUE,
   PipelineName VARCHAR(200),
   PLStartTime DATETIME2(3),
   PLEndTime DATETIME2(3),
