@@ -59,7 +59,6 @@
     <Folder Include="Tables" />
   </ItemGroup>
   <ItemGroup>
-    <Build Include="Schemas\Apprenticeship.sql" />
     <Build Include="Tables\AdhocEmploymentVerification.sql" />
     <Build Include="Tables\CheckType.sql" />
     <Build Include="Tables\CommitmentStatus.sql" />

@@ -1,4 +1,4 @@
-CREATE TABLE [apprenticeship].[stg_EmploymentVerification]
+CREATE TABLE [dbo].[stg_EmploymentVerification]
 (
   EmploymentVerificationId BIGINT NOT NULL Identity(1,1),
   CorrelationId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UC_stg_EmploymentVerification_CorrelationId UNIQUE,
