@@ -12,8 +12,8 @@
   MinDate DATE,
   MaxDate DATE,
   CheckTypeId SMALLINT NOT NULL,
-  CreatedOn DATETIME2(3) DEFAULT GETDATE(),
-  LastUpdatedOn DATETIME2(3) DEFAULT GETDATE(),
+  CreatedOn DATETIME2(7) DEFAULT GETDATE(),
+  LastUpdatedOn DATETIME2(7) DEFAULT GETDATE(),
   CONSTRAINT FK_EmploymentVerification_CheckTypeId FOREIGN KEY (CheckTypeId)
         REFERENCES dbo.CheckType(CheckTypeId)
 );

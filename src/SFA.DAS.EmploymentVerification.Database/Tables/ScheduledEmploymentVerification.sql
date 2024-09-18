@@ -11,8 +11,8 @@ CREATE TABLE [dbo].[ScheduledEmploymentVerification]
   CommitmentStatusId SMALLINT,
   PaymentStatusId SMALLINT,
   EmploymentCheckCount SMALLINT DEFAULT(0),
-  CreatedOn DATETIME2(3) DEFAULT GETDATE(),
-  LastUpdatedOn DATETIME2(3) DEFAULT GETDATE(),
+  CreatedOn DATETIME2(7) DEFAULT GETDATE(),
+  LastUpdatedOn DATETIME2(7) DEFAULT GETDATE(),
   CONSTRAINT FK_ScheduledEmploymentVerification_CommitmentStatusId FOREIGN KEY (CommitmentStatusId) REFERENCES dbo.CommitmentStatus(CommitmentStatusId),
   CONSTRAINT FK_ScheduledEmploymentVerification_PaymentStatusId FOREIGN KEY (PaymentStatusId) REFERENCES dbo.PaymentStatus(PaymentStatusId)      
 );
