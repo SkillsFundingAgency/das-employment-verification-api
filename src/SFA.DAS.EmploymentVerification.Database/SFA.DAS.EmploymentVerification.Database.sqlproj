@@ -66,9 +66,8 @@
     <Build Include="Tables\LogError.sql" />
     <Build Include="Tables\LogETLCounts.sql" />
     <Build Include="Tables\LogETLJob.sql" />
+    <Build Include="Tables\PaymentStatus.sql" />
     <Build Include="Tables\ScheduledEmploymentVerification.sql" />
-    <Build Include="Tables\stg_EmploymentVerification.sql" />
-    <Build Include="Tables\stg_ScheduledEmploymentVerification.sql" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Condition="'$(NetCoreBuild)' == 'true'">
