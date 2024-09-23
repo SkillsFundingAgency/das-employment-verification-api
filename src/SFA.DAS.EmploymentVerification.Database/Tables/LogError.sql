@@ -4,7 +4,7 @@ CREATE TABLE [dbo].[LogError]
   PipelineId UNIQUEIDENTIFIER,
   ActivityName VARCHAR(255),
   ErrorMessage NVARCHAR(4000),
-  CreatedOn DATETIME2(7) DEFAULT GETDATE(),
+  CreatedOn DATETIME2(7) CONSTRAINT DF_LogError_CreatedOn DEFAULT GETDATE(),
   CONSTRAINT FK_LogError_PipelineId FOREIGN KEY (PipelineId)
         REFERENCES dbo.LogETLJob(PipelineId)
 );

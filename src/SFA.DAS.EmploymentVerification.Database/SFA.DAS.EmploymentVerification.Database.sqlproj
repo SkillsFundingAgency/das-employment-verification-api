@@ -60,6 +60,7 @@
   </ItemGroup>
   <ItemGroup>
     <Build Include="Tables\AdhocEmploymentVerification.sql" />
+    <Build Include="Tables\ApprovalsStatus.sql" />
     <Build Include="Tables\CheckType.sql" />
     <Build Include="Tables\CommitmentStatus.sql" />
     <Build Include="Tables\EmploymentVerification.sql" />
