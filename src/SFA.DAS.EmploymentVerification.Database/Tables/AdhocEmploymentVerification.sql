@@ -5,8 +5,8 @@ CREATE TABLE [dbo].[AdhocEmploymentVerification]
   ApprenticeshipId BIGINT,
   ULN BIGINT NOT NULL,
   EmployerAccountId BIGINT NOT NULL,
-  MinDate DATE,
-  MaxDate DATE,
+  MinDate DATE NOT NULL,
+  MaxDate DATE NOT NULL,
   CreatedOn DATETIME2(7) DEFAULT GETDATE(),
   CONSTRAINT UC_AdhocEmploymentVerification_CorrelationId UNIQUE (CorrelationId)
 );
