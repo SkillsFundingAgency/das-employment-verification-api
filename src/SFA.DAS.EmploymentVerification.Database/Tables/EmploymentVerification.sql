@@ -1,6 +1,6 @@
 ﻿CREATE TABLE [dbo].[EmploymentVerification]
 (
-  EmploymentVerificationId BIGINT NOT NULL Identity(1,1) Constraint PK_EmploymentVerification PRIMARY KEY,
+  EmploymentVerificationId BIGINT NOT NULL Identity(1,1) CONSTRAINT PK_EmploymentVerification PRIMARY KEY,
   CorrelationId UNIQUEIDENTIFIER NOT NULL CONSTRAINT UC_EmploymentVerification_CorrelationId UNIQUE,
   ApprenticeshipId BIGINT,
   Employed BIT,

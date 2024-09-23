@@ -1,6 +1,6 @@
 CREATE TABLE [dbo].[LogError]
 (
-  LogErrorId BIGINT NOT NULL Identity(1,1) Constraint PK_LogError PRIMARY KEY,
+  LogErrorId BIGINT NOT NULL Identity(1,1) CONSTRAINT PK_LogError PRIMARY KEY,
   PipelineId UNIQUEIDENTIFIER,
   ActivityName VARCHAR(255),
   ErrorMessage NVARCHAR(4000),
