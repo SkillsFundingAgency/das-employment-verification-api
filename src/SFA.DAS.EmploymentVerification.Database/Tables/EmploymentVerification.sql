@@ -8,7 +8,7 @@
   EmploymentCheckRequestDate DATETIME2(7),
   RequestCompletionStatus SMALLINT,
   ErrorType VARCHAR(200),
-  MessageSentDate DATE,
+  MessageSentDate DATETIME2(7),
   MinDate DATE,
   MaxDate DATE,
   CheckTypeId SMALLINT NOT NULL,
