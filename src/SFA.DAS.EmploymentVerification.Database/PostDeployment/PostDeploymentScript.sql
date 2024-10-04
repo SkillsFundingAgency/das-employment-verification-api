@@ -34,7 +34,7 @@ VALUES
     ('5', 'Deleted');
 
 --Insert data into PaymentStatus table
-INSERT INTO [dbo].[ApprovalsStatus] (ApprovalsStatusId, ApprovalsStatus)
+INSERT INTO [dbo].[ApprovalsStatus] (ApprovalsStatusId, Status)
 VALUES 
     ('0', 'None'),
     ('1', 'Employer'),
