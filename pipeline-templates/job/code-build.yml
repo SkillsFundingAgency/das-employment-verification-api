@@ -33,8 +33,8 @@ jobs:
       TargetFolder: $(build.artifactstagingdirectory)/publish
       OverWrite: true
 
-  # - task: PublishPipelineArtifact@1
-  #   displayName: Publish Build Artifact
-  #   inputs:
-  #     targetPath: $(build.artifactstagingdirectory)/publish
-  #     artifactName: ${{ parameters.SolutionBaseName }}
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Build Artifact
+    inputs:
+      targetPath: $(build.artifactstagingdirectory)/publish
+      artifactName: ${{ parameters.SolutionBaseName }}
