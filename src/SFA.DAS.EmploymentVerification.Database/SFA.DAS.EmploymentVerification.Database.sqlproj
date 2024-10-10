@@ -57,9 +57,11 @@
   <ItemGroup>
     <Folder Include="PostDeployment" />
     <Folder Include="Properties" />
+    <Folder Include="Stored Procedures" />
     <Folder Include="Tables" />
   </ItemGroup>
   <ItemGroup>
+    <Build Include="Stored Procedures\UpsertLogETLJob.sql" />
     <Build Include="Tables\AdhocEmploymentVerification.sql" />
     <Build Include="Tables\ApprovalsStatus.sql" />
     <Build Include="Tables\CheckType.sql" />
