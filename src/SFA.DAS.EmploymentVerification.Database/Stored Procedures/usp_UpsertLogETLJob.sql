@@ -1,4 +1,4 @@
-CREATE PROCEDURE [dbo].[UpsertLogETLJob]
+CREATE PROCEDURE [dbo].[usp_UpsertLogETLJob]
     @PipelineId UNIQUEIDENTIFIER,
     @PipelineName VARCHAR(400),
     @PLStartTime DATETIME2(7),
