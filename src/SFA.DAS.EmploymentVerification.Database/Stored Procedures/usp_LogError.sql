@@ -11,4 +11,5 @@ BEGIN
     VALUES
         (@PipelineId, @ActivityName, @ErrorMessage);
     RETURN 0;
+
 END
