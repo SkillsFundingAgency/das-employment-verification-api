@@ -64,6 +64,7 @@
     <Build Include="Stored Procedures\usp_LogError.sql" />
     <Build Include="Stored Procedures\usp_LogETLCounts.sql" />
     <Build Include="Stored Procedures\usp_UpsertLogETLJob.sql" />
+    <Build Include="Stored Procedures\usp_UpsertScheduledEmploymentVerification.sql" />
     <Build Include="Tables\AdhocEmploymentVerification.sql" />
     <Build Include="Tables\ApprovalsStatus.sql" />
     <Build Include="Tables\CheckType.sql" />
