@@ -57,11 +57,23 @@ BEGIN
 	BEGIN CATCH
 		--Rollback the transaction
 		ROLLBACK TRAN
-		--Log error details
+
+		DECLARE @ErrorMessage NVARCHAR(4000),
+      @ErrorSeverity INT,
+      @ErrorState INT;
+
+    SELECT @ErrorMessage = ERROR_MESSAGE(),
+      @ErrorSeverity = ERROR_SEVERITY(),
+      @ErrorState = ERROR_STATE();
+
+        --Log error details
 		INSERT INTO LogError(PipelineId, ActivityName, ErrorMessage)
 		SELECT 
 			@PipelineId,
 			@ActivityName,
 			ERROR_MESSAGE() AS ErrorMessage
+
+    -- Rethrow the error to make ADF fail the pipeline
+    RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
 	END CATCH
 END
