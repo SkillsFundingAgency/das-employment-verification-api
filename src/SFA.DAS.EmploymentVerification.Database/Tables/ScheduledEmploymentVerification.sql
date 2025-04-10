@@ -13,10 +13,11 @@ CREATE TABLE [dbo].[ScheduledEmploymentVerification]
   EmployerAndProviderApprovedOn DATETIME2(7),
   TransferApprovalActionedOn DATETIME2(7),
   EmploymentCheckCount SMALLINT CONSTRAINT DF_ScheduledEmploymentVerification_EmploymentCheckCount DEFAULT 0,
+  AdditionalEmploymentCheck SMALLINT CONSTRAINT DF_AdditionalEmploymentCheck_AdditionalEmploymentCheck DEFAULT 0 ,
   CreatedOn DATETIME2(7) CONSTRAINT DF_ScheduledEmploymentVerification_CreatedOn DEFAULT GETDATE(),
   LastUpdatedOn DATETIME2(7) CONSTRAINT DF_ScheduledEmploymentVerification_LastUpdatedOn DEFAULT GETDATE(),
   CONSTRAINT FK_ScheduledEmploymentVerification_CommitmentStatusId FOREIGN KEY (CommitmentStatusId) REFERENCES dbo.CommitmentStatus(CommitmentStatusId),
   CONSTRAINT FK_ScheduledEmploymentVerification_PaymentStatusId FOREIGN KEY (PaymentStatusId) REFERENCES dbo.PaymentStatus(PaymentStatusId),
-  CONSTRAINT FK_ScheduledEmploymentVerification_ApprovalsStatusId FOREIGN KEY (ApprovalsStatusId) REFERENCES dbo.ApprovalsStatus(ApprovalsStatusId)      
+  CONSTRAINT FK_ScheduledEmploymentVerification_ApprovalsStatusId FOREIGN KEY (ApprovalsStatusId) REFERENCES dbo.ApprovalsStatus(ApprovalsStatusId)
 );
 GO
