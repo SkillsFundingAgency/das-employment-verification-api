@@ -2,9 +2,9 @@ using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 
-namespace SFA.DAS.EmploymentVerificationService.Functions.Functions;
+namespace SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 
-public class PingFunction
+public class PingHttpTrigger
 {
     [Function("Ping")]
     public async Task<HttpResponseData> Run(
