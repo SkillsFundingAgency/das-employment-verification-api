@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.UnitTests", "tests\SFA.DAS.EmploymentVerificationService.UnitTests\SFA.DAS.EmploymentVerificationService.UnitTests.csproj", "{70CC5E85-9805-484D-8F85-BB3864772A24}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.Messages", "src\SFA.DAS.EmploymentVerificationService.Messages\SFA.DAS.EmploymentVerificationService.Messages.csproj", "{EDAEFC43-4370-4470-B44F-402726D59683}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,6 +25,10 @@ Global
 		{70CC5E85-9805-484D-8F85-BB3864772A24}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{70CC5E85-9805-484D-8F85-BB3864772A24}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{70CC5E85-9805-484D-8F85-BB3864772A24}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EDAEFC43-4370-4470-B44F-402726D59683}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDAEFC43-4370-4470-B44F-402726D59683}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDAEFC43-4370-4470-B44F-402726D59683}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDAEFC43-4370-4470-B44F-402726D59683}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
