@@ -1,9 +1,6 @@
 namespace SFA.DAS.EmploymentVerificationService.Messages.Learner.Events;
 
-public class VerifyNotEmployedCompleted
+public class VerifyNotEmployedCompleted : EmploymentVerificationEventBase
 {
-    public Guid CorrelationId { get; set; }
-    public long ULN { get; set; }
-    public long EmployerAccountIdentifier { get; set; }
     public bool NotEmployed { get; set; }
 }
