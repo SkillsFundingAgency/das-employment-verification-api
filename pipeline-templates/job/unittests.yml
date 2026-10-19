@@ -21,7 +21,7 @@ jobs:
   - task: DotNetCoreCLI@2
     displayName: 'dotnet build'
     inputs:
-      projects: src/tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
+      projects: tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
       arguments: '--configuration $(BuildConfiguration)'
       vstsFeed: '1d5deb2d-cf8b-4bb1-b147-d13bc246e3f4'
 
@@ -29,7 +29,7 @@ jobs:
     displayName: 'dotnet test UnitTest Projects'
     inputs:
       command: test
-      projects: src/tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
+      projects: tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
       arguments: '--filter FullyQualifiedName~UnitTests'
 
   - task: DotNetCoreCLI@2
@@ -37,7 +37,7 @@ jobs:
     inputs:
       command: publish
       publishWebProjects: false
-      projects: src/tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
+      projects: tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
       arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)\EmploymentVerificationFunctionUnitTests'
       modifyOutputPath: false
       vstsFeed: '1d5deb2d-cf8b-4bb1-b147-d13bc246e3f4'
@@ -47,7 +47,7 @@ jobs:
     enabled: true
 
     inputs:
-      solution: 'src/tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj'
+      solution: 'tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj'
       msbuildArchitecture: 'x64'
       platform: '$(BuildPlatform)'
       configuration: '$(BuildConfiguration)'
