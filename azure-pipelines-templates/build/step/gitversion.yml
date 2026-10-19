@@ -5,7 +5,7 @@ steps:
 - task: gitversion/setup@0
   displayName: gitversion/setup
   inputs:
-    versionSpec: 5.x
+    versionSpec: 5.12.0
 
 - task: gitversion/execute@0
   displayName: gitversion/execute
