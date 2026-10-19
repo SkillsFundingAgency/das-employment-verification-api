@@ -1,0 +1,151 @@
+trigger:
+  batch: true
+  branches:
+    include:
+      - "main"
+
+variables:
+- name: BuildPlatform
+  value : 'x64'
+- name: BuildConfiguration
+  value: 'release'
+- name: SolutionBaseName
+  value: 'SFA.DAS.Employment.Verification.Function'
+- name: ArtifactName
+  value: 'EmploymentVerificationFunctionApp'
+- group: Release Management Resources
+- group: RELEASE das-employment-verification-function
+
+resources:
+  repositories:
+    - repository: self
+      fetchDepth: 0
+    - repository: das-platform-building-blocks
+      type: github
+      name: SkillsFundingAgency/das-platform-building-blocks
+      endpoint: SkillsFundingAgency
+      ref: refs/heads/master
+    - repository: das-platform-automation
+      type: github
+      name: SkillsFundingAgency/das-platform-automation
+      endpoint: SkillsFundingAgency
+      ref: refs/heads/master
+
+stages:
+- stage: Build_Unit_Tests
+  displayName: 'Build and Unit Tests'
+  jobs:
+  - template: pipeline-templates/job/code-build.yml
+  - template: pipeline-templates/job/unittests.yml
+
+- stage: Deploy_DST
+  dependsOn: Build_Unit_Tests
+  displayName: 'Deploy to DST'
+  variables:
+  - name: tagEnvironment
+    value: Dev/Test
+  - group: DCOL-DST - Environment Key Vault Secrets
+  - group: DST das-employment-verification-function
+  jobs:
+  - template: pipeline-templates/deploy.yml
+    parameters:
+      ServiceConnection: DCT-VSO
+      SolutionBaseName: ${{ variables.SolutionBaseName }}
+      ArtifactName: $(ArtifactName)
+      Environment: DST
+
+- stage: Deploy_DAS
+  dependsOn: Build_Unit_Tests
+  displayName: Deploy to DAS
+  variables:
+  - name: tagEnvironment
+    value: Dev/Test
+  - group: DCOL-DAS - Environment Key Vault Secrets
+  - group: DAS das-employment-verification-function
+  jobs:
+  - template: pipeline-templates/deploy.yml
+    parameters:
+      ServiceConnection: DCT-VSO
+      SolutionBaseName: ${{ variables.SolutionBaseName }}
+      ArtifactName: $(ArtifactName)
+      Environment: DAS
+
+- stage: Deploy_SIT
+  dependsOn: Build_Unit_Tests
+  displayName: Deploy to SIT
+  variables:
+  - name: tagEnvironment
+    value: Dev/Test
+  - group: DCOL-SIT - Environment Key Vault Secrets
+  - group: SIT das-employment-verification-function
+  jobs:
+  - template: pipeline-templates/deploy.yml
+    parameters:
+      ServiceConnection: DCT-VSO
+      SolutionBaseName: ${{ variables.SolutionBaseName }}
+      ArtifactName: $(ArtifactName)
+      Environment: SIT
+
+- stage: Deploy_ETE
+  dependsOn: Build_Unit_Tests
+  displayName: Deploy to ETE
+  variables:
+  - name: tagEnvironment
+    value: Dev/Test
+  - group: DCOL-ETE - Environment Key Vault Secrets
+  - group: ETE das-employment-verification-function
+  jobs:
+  - template: pipeline-templates/deploy.yml
+    parameters:
+      ServiceConnection: DCT-VSO
+      SolutionBaseName: ${{ variables.SolutionBaseName }}
+      ArtifactName: $(ArtifactName)
+      Environment: ETE
+
+- stage: Deploy_MO
+  dependsOn: Build_Unit_Tests
+  displayName: Deploy to MO
+  variables:
+  - name: tagEnvironment
+    value: Dev/Test
+  - group: DCOL-MO - Environment Key Vault Secrets
+  - group: MO das-employment-verification-function
+  jobs:
+  - template: pipeline-templates/deploy.yml
+    parameters:
+      ServiceConnection: DCOL-MO-VSTS
+      SolutionBaseName: ${{ variables.SolutionBaseName }}
+      ArtifactName: $(ArtifactName)
+      Environment: MO
+
+- stage: Deploy_PP
+  dependsOn: Build_Unit_Tests
+  displayName: Deploy to PP
+  variables:
+  - name: tagEnvironment
+    value: Dev/Test
+  - group: DCOL-PP - Environment Key Vault Secrets
+  - group: PP das-employment-verification-function
+  jobs:
+  - template: pipeline-templates/deploy.yml
+    parameters:
+      ServiceConnection: DCOLPPVSTS
+      SolutionBaseName: ${{ variables.SolutionBaseName }}
+      ArtifactName: $(ArtifactName)
+      Environment: PP
+
+- stage: Deploy_PD
+  dependsOn: Build_Unit_Tests
+  displayName: Deploy to PD
+  variables:
+  - name: tagEnvironment
+    value: Dev/Test
+  - group: DCOL-PD - Environment Key Vault Secrets
+  - group: PD das-employment-verification-function
+  jobs:
+  - template: pipeline-templates/deploy.yml
+    parameters:
+      ServiceConnection: DCOLPDVSTS
+      SolutionBaseName: ${{ variables.SolutionBaseName }}
+      ArtifactName: $(ArtifactName)
+      Environment: PD

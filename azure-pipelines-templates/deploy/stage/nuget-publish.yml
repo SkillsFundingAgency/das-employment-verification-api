@@ -1,0 +1,29 @@
+﻿# this template expects packages to be built with azure-pipelines-templates/build/step/nuget-build.yml
+stages:
+- stage: NuGetPublish
+  condition: and(succeeded(), or(eq(variables['Build.Reason'], 'Manual'), eq(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/main')))
+  displayName: Publish NuGet Package
+  pool:
+    name: SLD Build Pool
+  jobs:
+  - job: CleanArtifacts
+    displayName: Clean artifacts directory
+    workspace:
+      clean: all
+  - deployment: NuGetPush
+    dependsOn: CleanArtifacts
+    environment: Nuget
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: NuGetPackages
+          - task: NuGetCommand@2
+            displayName: NuGet push
+            inputs:
+              command: push
+              packagesToPush: '$(Pipeline.Workspace)/NuGetPackages/*.nupkg;!$(Pipeline.Workspace)/NuGetPackages/*.symbols.nupkg'
+              allowPackageConflicts: true
+              nuGetFeedType: external
+              publishFeedCredentials: 'SFA NuGet'
