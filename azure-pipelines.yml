@@ -47,7 +47,7 @@ stages:
   - group: DCOL-DST - Environment Key Vault Secrets
   - group: DST das-employment-verification-function
   jobs:
-  - template: pipeline-templates/deploy.yml
+  - template: pipeline-templates/job/deploy.yml
     parameters:
       ServiceConnection: DCT-VSO
       SolutionBaseName: ${{ variables.SolutionBaseName }}
@@ -63,7 +63,7 @@ stages:
   - group: DCOL-DAS - Environment Key Vault Secrets
   - group: DAS das-employment-verification-function
   jobs:
-  - template: pipeline-templates/deploy.yml
+  - template: pipeline-templates/job/deploy.yml
     parameters:
       ServiceConnection: DCT-VSO
       SolutionBaseName: ${{ variables.SolutionBaseName }}
@@ -79,7 +79,7 @@ stages:
   - group: DCOL-SIT - Environment Key Vault Secrets
   - group: SIT das-employment-verification-function
   jobs:
-  - template: pipeline-templates/deploy.yml
+  - template: pipeline-templates/job/deploy.yml
     parameters:
       ServiceConnection: DCT-VSO
       SolutionBaseName: ${{ variables.SolutionBaseName }}
@@ -95,7 +95,7 @@ stages:
   - group: DCOL-ETE - Environment Key Vault Secrets
   - group: ETE das-employment-verification-function
   jobs:
-  - template: pipeline-templates/deploy.yml
+  - template: pipeline-templates/job/deploy.yml
     parameters:
       ServiceConnection: DCT-VSO
       SolutionBaseName: ${{ variables.SolutionBaseName }}
@@ -111,7 +111,7 @@ stages:
   - group: DCOL-MO - Environment Key Vault Secrets
   - group: MO das-employment-verification-function
   jobs:
-  - template: pipeline-templates/deploy.yml
+  - template: pipeline-templates/job/deploy.yml
     parameters:
       ServiceConnection: DCOL-MO-VSTS
       SolutionBaseName: ${{ variables.SolutionBaseName }}
@@ -127,7 +127,7 @@ stages:
   - group: DCOL-PP - Environment Key Vault Secrets
   - group: PP das-employment-verification-function
   jobs:
-  - template: pipeline-templates/deploy.yml
+  - template: pipeline-templates/job/deploy.yml
     parameters:
       ServiceConnection: DCOLPPVSTS
       SolutionBaseName: ${{ variables.SolutionBaseName }}
@@ -143,7 +143,7 @@ stages:
   - group: DCOL-PD - Environment Key Vault Secrets
   - group: PD das-employment-verification-function
   jobs:
-  - template: pipeline-templates/deploy.yml
+  - template: pipeline-templates/job/deploy.yml
     parameters:
       ServiceConnection: DCOLPDVSTS
       SolutionBaseName: ${{ variables.SolutionBaseName }}
