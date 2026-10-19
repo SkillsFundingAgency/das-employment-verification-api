@@ -1,7 +1,7 @@
 jobs:
 - job: UnitTests
   pool:
-    name: SLD BUILD Pool - CD
+    name: SLD BUILD Pool - CI
     workspace:
       clean: all
   
@@ -15,7 +15,7 @@ jobs:
     displayName: 'dotnet restore'
     inputs:
       command: restore
-      projects: src/tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
+      projects: tests/SFA.DAS.EmploymentVerificationService.UnitTests/SFA.DAS.EmploymentVerificationService.UnitTests.csproj
       vstsFeed: '1d5deb2d-cf8b-4bb1-b147-d13bc246e3f4'
 
   - task: DotNetCoreCLI@2
