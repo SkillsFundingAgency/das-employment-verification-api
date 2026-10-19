@@ -3,7 +3,7 @@ parameters:
 jobs:
 - job: CodeBuild
   pool:
-    name: SLD BUILD Pool - CD
+    name: SLD BUILD Pool - CI
     #demands: LATEST_DOTNET_VERSION
     workspace:
       clean: all
