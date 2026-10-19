@@ -11,6 +11,11 @@ jobs:
      
   - group: BUILD Management Resources
   steps:
+  - checkout: self
+    clean: true
+    fetchDepth: 0
+    fetchTags: true
+    persistCredentials: true
 
   - template: /azure-pipelines-templates/build/step/gitversion.yml
 
