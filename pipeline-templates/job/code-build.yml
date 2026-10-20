@@ -1,40 +1,50 @@
 parameters:
-  SolutionBaseName:
-  BuildConfiguration:
-
+  TargetProjects: 'src/**/*.csproj'
 jobs:
 - job: CodeBuild
   pool:
-    name: DAS - Continuous Integration Agents
+    name: SLD BUILD Pool - CI
+    #demands: LATEST_DOTNET_VERSION
     workspace:
       clean: all
   variables:
+     
   - group: BUILD Management Resources
   steps:
-  - template: azure-pipelines-templates/build/step/gitversion.yml@das-platform-building-blocks
+  - checkout: self
+    clean: true
+    fetchDepth: 0
+    fetchTags: true
+    persistCredentials: true
 
-  - template: azure-pipelines-templates/build/step/app-build.yml@das-platform-building-blocks
+  - template: /azure-pipelines-templates/build/step/gitversion.yml
 
   - task: DotNetCoreCLI@2
-    displayName: Publish - dotnet publish ${{ parameters.SolutionBaseName }}
+    displayName: 'dotnet restore'
+    inputs:
+      command: restore
+      projects: ${{ parameters.TargetProjects }}
+      vstsFeed: '1d5deb2d-cf8b-4bb1-b147-d13bc246e3f4'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'dotnet build'
+    inputs:
+      projects: ${{ parameters.TargetProjects }}
+      arguments: '--configuration $(BuildConfiguration)'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'dotnet publish'
     inputs:
       command: publish
-      publishWebProjects: false #set to false as this setting (which defaults to true) will parse the entire repo for web projects
-      projects: src/${{ parameters.SolutionBaseName }}/${{ parameters.SolutionBaseName }}.csproj
-      arguments: -o $(build.artifactstagingdirectory)/publish -c ${{ parameters.BuildConfiguration }} --no-build
-      modifyOutputPath: true
-      zipAfterPublish: true
-
-  - task: CopyFiles@2
-    displayName: Copy Files to $(build.artifactstagingdirectory)/publish
-    inputs:
-      Contents: |
-        azure/**
-      TargetFolder: $(build.artifactstagingdirectory)/publish
-      OverWrite: true
+      publishWebProjects: false
+      projects: src/SFA.DAS.EmploymentVerificationService.Functions/SFA.DAS.EmploymentVerificationService.Functions.csproj
+      arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)\EmploymentVerificationFunctionApp --no-self-contained'
+      modifyOutputPath: false
+      zipAfterPublish: false
 
   - task: PublishPipelineArtifact@1
-    displayName: Publish Build Artifact
+    displayName: 'Publish Pipeline Artifact'
     inputs:
-      targetPath: $(build.artifactstagingdirectory)/publish
-      artifactName: ${{ parameters.SolutionBaseName }}
+      targetPath: '$(build.artifactstagingdirectory)\EmploymentVerificationFunctionApp'
+      artifact: EmploymentVerificationFunctionApp
+
