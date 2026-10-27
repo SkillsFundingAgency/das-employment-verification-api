@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -11,12 +11,20 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.Messages", "src\SFA.DAS.EmploymentVerificationService.Messages\SFA.DAS.EmploymentVerificationService.Messages.csproj", "{EDAEFC43-4370-4470-B44F-402726D59683}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.Application", "src\SFA.DAS.EmploymentVerificationService.Application\SFA.DAS.EmploymentVerificationService.Application.csproj", "{EA32CE0B-9702-4B02-88B8-56C46C4EF6B3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.Data", "src\SFA.DAS.EmploymentVerificationService.Data\SFA.DAS.EmploymentVerificationService.Data.csproj", "{5242BDA8-B849-4A57-92F4-FF44D1A98015}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5242BDA8-B849-4A57-92F4-FF44D1A98015}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5242BDA8-B849-4A57-92F4-FF44D1A98015}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5242BDA8-B849-4A57-92F4-FF44D1A98015}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5242BDA8-B849-4A57-92F4-FF44D1A98015}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A967EA6F-38DB-73FE-3969-C72378284D55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A967EA6F-38DB-73FE-3969-C72378284D55}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A967EA6F-38DB-73FE-3969-C72378284D55}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -29,6 +37,10 @@ Global
 		{EDAEFC43-4370-4470-B44F-402726D59683}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EDAEFC43-4370-4470-B44F-402726D59683}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EDAEFC43-4370-4470-B44F-402726D59683}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA32CE0B-9702-4B02-88B8-56C46C4EF6B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA32CE0B-9702-4B02-88B8-56C46C4EF6B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA32CE0B-9702-4B02-88B8-56C46C4EF6B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA32CE0B-9702-4B02-88B8-56C46C4EF6B3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
