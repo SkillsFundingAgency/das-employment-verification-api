@@ -5,147 +5,133 @@ trigger:
       - "main"
 
 variables:
-- name: BuildPlatform
-  value : 'x64'
-- name: BuildConfiguration
-  value: 'release'
 - name: SolutionBaseName
-  value: 'SFA.DAS.Employment.Verification.Function'
-- name: ArtifactName
-  value: 'EmploymentVerificationFunctionApp'
-- group: Release Management Resources
-- group: RELEASE das-employment-verification-function
+  value: SFA.DAS.EmploymentVerificationService
+- name: BuildConfiguration
+  value: release
+- name: BuildPlatform
+  value: any cpu
+- group: RELEASE Management Resources
+- group: RELEASE das-employment-verification-api
+- name: Deploy
+  value: $[or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual'), eq(variables['Build.Reason'], 'PullRequest'))]
 
 resources:
   repositories:
-    - repository: self
-      fetchDepth: 0
-    - repository: das-platform-building-blocks
-      type: github
-      name: SkillsFundingAgency/das-platform-building-blocks
-      endpoint: SkillsFundingAgency
-      ref: refs/heads/master
-    - repository: das-platform-automation
-      type: github
-      name: SkillsFundingAgency/das-platform-automation
-      endpoint: SkillsFundingAgency
-      ref: refs/heads/master
+  - repository: self
+  - repository: das-platform-building-blocks
+    type: github
+    name: SkillsFundingAgency/das-platform-building-blocks
+    ref: refs/tags/3.0.38
+    endpoint: SkillsFundingAgency
+  - repository: das-platform-automation
+    type: github
+    name: SkillsFundingAgency/das-platform-automation
+    ref: refs/tags/5.1.26
+    endpoint: SkillsFundingAgency
+  pipelines:
+  - pipeline: das-employer-config
+    project: Digital Apprenticeship Service
+    source: das-employer-config
+    branch: master
 
 stages:
-- stage: Build_Unit_Tests
-  displayName: 'Build and Unit Tests'
+- stage: Build
   jobs:
   - template: pipeline-templates/job/code-build.yml
-  - template: pipeline-templates/job/unittests.yml
+    parameters:
+      SolutionBaseName: $(SolutionBaseName)
+      BuildConfiguration: $(BuildConfiguration)
 
-- stage: Deploy_DST
-  dependsOn: Build_Unit_Tests
-  displayName: 'Deploy to DST'
+- stage: Deploy_AT
+  dependsOn: Build
+  displayName: Deploy to AT
+  condition: and(succeeded(), eq(variables.Deploy, 'true'))
   variables:
-  - name: tagEnvironment
-    value: Dev/Test
-  - group: DCOL-DST - Environment Key Vault Secrets
-  - group: DST das-employment-verification-function
+  - group: DevTest Management Resources
+  - group: AT DevTest Shared Resources
   jobs:
   - template: pipeline-templates/job/deploy.yml
     parameters:
-      ServiceConnection: DCT-VSO
-      SolutionBaseName: ${{ variables.SolutionBaseName }}
-      ArtifactName: $(ArtifactName)
-      Environment: DST
+      Environment: AT
+      SolutionBaseName: $(SolutionBaseName)
+      ServiceConnection: SFA-DAS-DevTest-ARM
 
-- stage: Deploy_DAS
-  dependsOn: Build_Unit_Tests
-  displayName: Deploy to DAS
+- stage: Deploy_TEST
+  dependsOn: Build
+  displayName: Deploy to TEST
   variables:
-  - name: tagEnvironment
-    value: Dev/Test
-  - group: DCOL-DAS - Environment Key Vault Secrets
-  - group: DAS das-employment-verification-function
+  - group: DevTest Management Resources
+  - group: TEST DevTest Shared Resources
   jobs:
   - template: pipeline-templates/job/deploy.yml
     parameters:
-      ServiceConnection: DCT-VSO
-      SolutionBaseName: ${{ variables.SolutionBaseName }}
-      ArtifactName: $(ArtifactName)
-      Environment: DAS
+      Environment: TEST
+      SolutionBaseName: $(SolutionBaseName)
+      ServiceConnection: SFA-DAS-DevTest-ARM
 
-- stage: Deploy_SIT
-  dependsOn: Build_Unit_Tests
-  displayName: Deploy to SIT
+- stage: Deploy_TEST2
+  dependsOn: Build
+  displayName: Deploy to TEST2
   variables:
-  - name: tagEnvironment
-    value: Dev/Test
-  - group: DCOL-SIT - Environment Key Vault Secrets
-  - group: SIT das-employment-verification-function
+  - group: DevTest Management Resources
+  - group: TEST2 DevTest Shared Resources
   jobs:
   - template: pipeline-templates/job/deploy.yml
     parameters:
-      ServiceConnection: DCT-VSO
-      SolutionBaseName: ${{ variables.SolutionBaseName }}
-      ArtifactName: $(ArtifactName)
-      Environment: SIT
+      Environment: TEST2
+      SolutionBaseName: $(SolutionBaseName)
+      ServiceConnection: SFA-DAS-DevTest-ARM
 
-- stage: Deploy_ETE
-  dependsOn: Build_Unit_Tests
-  displayName: Deploy to ETE
+- stage: Deploy_DEMO
+  dependsOn: Build
+  displayName: Deploy to DEMO
   variables:
-  - name: tagEnvironment
-    value: Dev/Test
-  - group: DCOL-ETE - Environment Key Vault Secrets
-  - group: ETE das-employment-verification-function
+  - group: DevTest Management Resources
+  - group: DEMO DevTest Shared Resources
   jobs:
   - template: pipeline-templates/job/deploy.yml
     parameters:
-      ServiceConnection: DCT-VSO
-      SolutionBaseName: ${{ variables.SolutionBaseName }}
-      ArtifactName: $(ArtifactName)
-      Environment: ETE
-
-- stage: Deploy_MO
-  dependsOn: Build_Unit_Tests
-  displayName: Deploy to MO
-  variables:
-  - name: tagEnvironment
-    value: Dev/Test
-  - group: DCOL-MO - Environment Key Vault Secrets
-  - group: MO das-employment-verification-function
-  jobs:
-  - template: pipeline-templates/job/deploy.yml
-    parameters:
-      ServiceConnection: DCOL-MO-VSTS
-      SolutionBaseName: ${{ variables.SolutionBaseName }}
-      ArtifactName: $(ArtifactName)
-      Environment: MO
+      Environment: DEMO
+      SolutionBaseName: $(SolutionBaseName)
+      ServiceConnection: SFA-DAS-DevTest-ARM
 
 - stage: Deploy_PP
-  dependsOn: Build_Unit_Tests
+  dependsOn: Build
   displayName: Deploy to PP
   variables:
-  - name: tagEnvironment
-    value: Dev/Test
-  - group: DCOL-PP - Environment Key Vault Secrets
-  - group: PP das-employment-verification-function
+  - group: PreProd Management Resources
+  - group: PreProd Shared Resources
   jobs:
   - template: pipeline-templates/job/deploy.yml
     parameters:
-      ServiceConnection: DCOLPPVSTS
-      SolutionBaseName: ${{ variables.SolutionBaseName }}
-      ArtifactName: $(ArtifactName)
       Environment: PP
+      SolutionBaseName: $(SolutionBaseName)
+      ServiceConnection: SFA-DIG-PreProd-ARM
 
-- stage: Deploy_PD
-  dependsOn: Build_Unit_Tests
-  displayName: Deploy to PD
-  variables:
-  - name: tagEnvironment
-    value: Dev/Test
-  - group: DCOL-PD - Environment Key Vault Secrets
-  - group: PD das-employment-verification-function
-  jobs:
-  - template: pipeline-templates/job/deploy.yml
-    parameters:
-      ServiceConnection: DCOLPDVSTS
-      SolutionBaseName: ${{ variables.SolutionBaseName }}
-      ArtifactName: $(ArtifactName)
-      Environment: PD
+# - stage: Deploy_PROD
+#   dependsOn: Build
+#   displayName: Deploy to PROD
+#   variables:
+#   - group: PROD Management Resources
+#   - group: PROD Shared Resources
+#   - group: PROD das-employment-verification-api
+#   jobs:
+#   - template: pipeline-templates/job/deploy.yml
+#     parameters:
+#       Environment: PROD
+#       SolutionBaseName: $(SolutionBaseName)
+#       ServiceConnection: SFA-DIG-Prod-ARM
+
+# - stage: Deploy_MO
+#   dependsOn: Build
+#   displayName: Deploy to MO
+#   variables:
+#   - group: MO Management Resources
+#   - group: MO Shared Resources
+#   jobs:
+#   - template: pipeline-templates/job/deploy.yml
+#     parameters:
+#       Environment: MO
+#       SolutionBaseName: $(SolutionBaseName)
+#       ServiceConnection: SFA-ASM-ModelOffice-ARM
