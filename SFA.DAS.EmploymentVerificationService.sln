@@ -11,12 +11,18 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.Messages", "src\SFA.DAS.EmploymentVerificationService.Messages\SFA.DAS.EmploymentVerificationService.Messages.csproj", "{EDAEFC43-4370-4470-B44F-402726D59683}"
 EndProject
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "SFA.DAS.EmploymentVerification.Database", "src\SFA.DAS.EmploymentVerification.Database\SFA.DAS.EmploymentVerification.Database.sqlproj", "{04F31D78-1BBA-4059-9802-25D702555814}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{04F31D78-1BBA-4059-9802-25D702555814}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04F31D78-1BBA-4059-9802-25D702555814}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A967EA6F-38DB-73FE-3969-C72378284D55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A967EA6F-38DB-73FE-3969-C72378284D55}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A967EA6F-38DB-73FE-3969-C72378284D55}.Release|Any CPU.ActiveCfg = Release|Any CPU
