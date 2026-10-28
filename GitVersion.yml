@@ -1,11 +1,1 @@
-mode: mainline
-legacy-semver-padding: 0
-build-metadata-padding: 0
-commits-since-version-source-padding: 0
-assembly-versioning-scheme: MajorMinorPatch
-assembly-file-versioning-scheme: MajorMinorPatchTag
-assembly-informational-format: '{LegacySemVer}'
-major-version-bump-message: '\+semver:\s?(breaking|major)'
-minor-version-bump-message: '\+semver:\s?(feature|minor)'
-no-bump-message: '\+semver:\s?(none|skip)'
-patch-version-bump-message: '\+semver:\s?(fix|patch)'
+mode: Mainline
