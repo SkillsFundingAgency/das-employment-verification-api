@@ -6,7 +6,8 @@ namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 
 public sealed class EmploymentCheckCompletionService(
     IEmploymentCheckStore store,
-    IEmploymentVerificationPublisher publisher)
+    IEmploymentVerificationPublisher publisher,
+    TimeProvider timeProvider)
 {
     public async Task ProcessAsync(EmploymentCheckResult result, CancellationToken cancellationToken)
     {
@@ -27,7 +28,7 @@ public sealed class EmploymentCheckCompletionService(
             request.CorrelationId,
             employed,
             (byte)EmploymentCheckStatus.Completed,
-            result.CheckDate), cancellationToken);
+            timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
 
         await publisher.PublishAsync(new VerifyNotEmployedCompleted
         {

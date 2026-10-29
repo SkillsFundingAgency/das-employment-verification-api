@@ -10,6 +10,7 @@ namespace SFA.DAS.EmploymentVerificationService.Application.UnitTests.Services;
 [TestFixture]
 public class EmploymentCheckCompletionServiceTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 10, 29, 12, 34, 56, TimeSpan.Zero);
     private Mock<IEmploymentCheckStore> store = null!;
     private Mock<IEmploymentVerificationPublisher> publisher = null!;
     private EmploymentCheckCompletionService service = null!;
@@ -21,7 +22,7 @@ public class EmploymentCheckCompletionServiceTests
     {
         store = new Mock<IEmploymentCheckStore>(MockBehavior.Strict);
         publisher = new Mock<IEmploymentVerificationPublisher>(MockBehavior.Strict);
-        service = new EmploymentCheckCompletionService(store.Object, publisher.Object);
+        service = new EmploymentCheckCompletionService(store.Object, publisher.Object, new FixedTimeProvider());
         request = new EmploymentCheckRequest(Guid.NewGuid(), 1234567890, 456, 789, "reference",
             new DateTime(2026, 1, 1), new DateTime(2026, 3, 2), 1,
             (byte)EmploymentCheckStatus.InProgress, new DateTime(2026, 1, 1));
@@ -35,7 +36,7 @@ public class EmploymentCheckCompletionServiceTests
     {
         request = request with { ApprenticeshipId = apprenticeshipId };
         result = result with { EmploymentResult = employed };
-        var expected = new EmploymentCheckCompletion(request.CorrelationId, employed, 2, result.CheckDate);
+        var expected = new EmploymentCheckCompletion(request.CorrelationId, employed, 2, Now.UtcDateTime);
         store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
         store.Setup(x => x.RecordCompletionAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.Is<VerifyNotEmployedCompleted>(message =>
@@ -49,6 +50,28 @@ public class EmploymentCheckCompletionServiceTests
 
         store.VerifyAll();
         publisher.VerifyAll();
+    }
+
+    [Test]
+    public async Task ProcessAsync_RecordsCurrentUtcTimeInsteadOfIncomingCheckDate()
+    {
+        EmploymentCheckCompletion? recorded = null;
+        store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
+        store.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None))
+            .Callback<EmploymentCheckCompletion, CancellationToken>((completion, _) => recorded = completion)
+            .Returns(Task.CompletedTask);
+        publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None)).Returns(Task.CompletedTask);
+
+        await service.ProcessAsync(result, CancellationToken.None);
+
+        Assert.That(recorded, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(recorded!.CreatedOn, Is.EqualTo(Now.UtcDateTime));
+            Assert.That(recorded.CreatedOn.Kind, Is.EqualTo(DateTimeKind.Utc));
+            Assert.That(recorded.CreatedOn, Is.Not.EqualTo(result.CheckDate));
+            Assert.That(result.CheckDate, Is.EqualTo(new DateTime(2026, 3, 3, 12, 0, 0, DateTimeKind.Utc)));
+        });
     }
 
     [Test]
@@ -135,5 +158,9 @@ public class EmploymentCheckCompletionServiceTests
         store.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);
         store.VerifyNoOtherCalls();
         publisher.VerifyNoOtherCalls();
+    }
+    private sealed class FixedTimeProvider : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 }
