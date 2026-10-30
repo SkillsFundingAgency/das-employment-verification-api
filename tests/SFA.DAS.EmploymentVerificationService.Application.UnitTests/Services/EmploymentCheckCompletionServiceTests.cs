@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
@@ -22,7 +23,7 @@ public class EmploymentCheckCompletionServiceTests
     {
         store = new Mock<IEmploymentCheckStore>(MockBehavior.Strict);
         publisher = new Mock<IEmploymentVerificationPublisher>(MockBehavior.Strict);
-        service = new EmploymentCheckCompletionService(store.Object, publisher.Object, new FixedTimeProvider());
+        service = new EmploymentCheckCompletionService(store.Object, publisher.Object, new FixedTimeProvider(), NullLogger<EmploymentCheckCompletionService>.Instance);
         request = new EmploymentCheckRequest(Guid.NewGuid(), 1234567890, 456, 789, "reference",
             new DateTime(2026, 1, 1), new DateTime(2026, 3, 2), 1,
             (byte)EmploymentCheckStatus.InProgress, new DateTime(2026, 1, 1));

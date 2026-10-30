@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Mapping;
@@ -23,7 +24,7 @@ public class VerifyNotEmployedServiceTests
         store = new Mock<IEmploymentCheckStore>(MockBehavior.Strict);
         client = new Mock<IEmploymentCheckClient>(MockBehavior.Strict);
         factory = new EmploymentCheckRequestFactory(new FixedTimeProvider());
-        service = new VerifyNotEmployedService(store.Object, factory, client.Object);
+        service = new VerifyNotEmployedService(store.Object, factory, client.Object, NullLogger<VerifyNotEmployedService>.Instance);
         command = new VerifyNotEmployed
         {
             CorrelationId = Guid.NewGuid(),

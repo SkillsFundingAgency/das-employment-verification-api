@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Application.Persistence;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Events;
@@ -7,7 +8,8 @@ namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 public sealed class EmploymentCheckCompletionService(
     IEmploymentCheckStore store,
     IEmploymentVerificationPublisher publisher,
-    TimeProvider timeProvider) : IEmploymentCheckCompletionService
+    TimeProvider timeProvider,
+    ILogger<EmploymentCheckCompletionService> logger) : IEmploymentCheckCompletionService
 {
     public async Task ProcessAsync(EmploymentCheckResult result, CancellationToken cancellationToken)
     {
@@ -16,6 +18,7 @@ public sealed class EmploymentCheckCompletionService(
         var request = await store.GetRequestAsync(result.CorrelationId, cancellationToken);
         if (request is null)
         {
+            logger.LogWarning("No matching request found for {CorrelationId}", result.CorrelationId);
             return;
         }
 
@@ -29,6 +32,7 @@ public sealed class EmploymentCheckCompletionService(
             employed,
             (byte)EmploymentCheckStatus.Completed,
             timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
+        logger.LogInformation("Employment check result persisted for {CorrelationId}", result.CorrelationId);
 
         await publisher.PublishAsync(new VerifyNotEmployedCompleted
         {
@@ -38,5 +42,6 @@ public sealed class EmploymentCheckCompletionService(
             EmployerAccountIdentifier = request.AccountId,
             NotEmployed = !employed
         }, cancellationToken);
+        logger.LogInformation("VerifyNotEmployedCompleted event published for {CorrelationId}", result.CorrelationId);
     }
 }

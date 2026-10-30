@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,7 +51,7 @@ public class EmploymentCheckCompletedTriggerTests
         var service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
 
-        await new EmploymentCheckCompletedTrigger(service.Object).Run(message, CancellationToken.None);
+        await new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, Mock.Of<FunctionContext>(), CancellationToken.None);
 
         Assert.That(message.CheckDate.Kind, Is.EqualTo(DateTimeKind.Utc));
         service.Verify(x => x.ProcessAsync(expected, CancellationToken.None), Times.Once);
@@ -66,7 +67,7 @@ public class EmploymentCheckCompletedTriggerTests
         service.Setup(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token))
             .Returns(Task.CompletedTask);
 
-        await new EmploymentCheckCompletedTrigger(service.Object).Run(message, source.Token);
+        await new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, Mock.Of<FunctionContext>(), source.Token);
 
         service.Verify(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token), Times.Once);
         service.VerifyNoOtherCalls();
@@ -82,7 +83,7 @@ public class EmploymentCheckCompletedTriggerTests
             .ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new EmploymentCheckCompletedTrigger(service.Object).Run(message, CancellationToken.None));
+            new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, Mock.Of<FunctionContext>(), CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
@@ -98,6 +99,6 @@ public class EmploymentCheckCompletedTriggerTests
             .Returns(Task.FromCanceled(source.Token));
 
         Assert.ThrowsAsync<TaskCanceledException>(() =>
-            new EmploymentCheckCompletedTrigger(service.Object).Run(message, source.Token));
+            new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, Mock.Of<FunctionContext>(), source.Token));
     }
 }
