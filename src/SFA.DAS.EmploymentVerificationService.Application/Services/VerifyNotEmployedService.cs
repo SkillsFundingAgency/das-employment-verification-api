@@ -7,7 +7,7 @@ namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 public sealed class VerifyNotEmployedService(
     IEmploymentCheckStore store,
     EmploymentCheckRequestFactory requestFactory,
-    IEmploymentCheckClient client)
+    IEmploymentCheckClient client) : IVerifyNotEmployedService
 {
     public async Task ProcessAsync(VerifyNotEmployed command, CancellationToken cancellationToken)
     {
