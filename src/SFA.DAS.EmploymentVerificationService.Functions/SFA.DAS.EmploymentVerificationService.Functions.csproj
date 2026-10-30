@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.3.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.ServiceBus" Version="5.24.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.5" />
+    <PackageReference Include="SFA.DAS.EmploymentCheck.Types" Version="1.1.100" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../SFA.DAS.EmploymentVerificationService.Application/SFA.DAS.EmploymentVerificationService.Application.csproj" />

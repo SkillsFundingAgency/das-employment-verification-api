@@ -7,7 +7,7 @@ namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 public sealed class EmploymentCheckCompletionService(
     IEmploymentCheckStore store,
     IEmploymentVerificationPublisher publisher,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider) : IEmploymentCheckCompletionService
 {
     public async Task ProcessAsync(EmploymentCheckResult result, CancellationToken cancellationToken)
     {
