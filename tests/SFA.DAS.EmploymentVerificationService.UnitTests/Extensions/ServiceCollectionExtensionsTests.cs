@@ -57,13 +57,36 @@ public class ServiceCollectionExtensionsTests
     [TestCase(null)]
     [TestCase("")]
     [TestCase(" ")]
-    public void AddEmploymentVerification_RejectsMissingSqlSettingWhenContextIsResolved(string? value)
+    [TestCase("\t\r\n")]
+    public void AddEmploymentVerification_RejectsMissingOrBlankSqlSettingDuringRegistration(string? value)
     {
-        using var provider = CreateServices(value).BuildServiceProvider();
-        using var scope = provider.CreateScope();
+        var failure = Assert.Throws<InvalidOperationException>(() => CreateServices(value));
+
+        Assert.That(failure!.Message, Does.Contain("SqlConnectionString"));
+    }
+
+    [Test]
+    public void AddEmploymentVerification_AllowsValidSqlSettingDuringRegistration()
+    {
+        Assert.DoesNotThrow(() => CreateServices(ConnectionString));
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("\t ")]
+    public void WorkerConfiguration_RejectsMissingOrBlankSqlSettingDuringHostBuild(string? value)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            value is null ? new Dictionary<string, string?>() :
+                new Dictionary<string, string?> { ["SqlConnectionString"] = value }).Build();
+        var builder = new HostBuilder()
+            .ConfigureFunctionsWorkerDefaults()
+            .ConfigureServices((_, services) => services.AddEmploymentVerification(configuration));
 
         var failure = Assert.Throws<InvalidOperationException>(() =>
-            scope.ServiceProvider.GetRequiredService<EmploymentVerificationDbContext>());
+        {
+            using var host = builder.Build();
+        });
 
         Assert.That(failure!.Message, Does.Contain("SqlConnectionString"));
     }

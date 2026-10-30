@@ -13,6 +13,13 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddEmploymentVerification(
         this IServiceCollection services, IConfiguration configuration)
     {
+        // Functions exposes local.settings.json Values and deployed app settings as environment variables.
+        var connectionString = configuration["SqlConnectionString"];
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("The SqlConnectionString setting is required for employment verification persistence.");
+        }
+
         services.AddSingleton<TimeProvider>(TimeProvider.System);
         services.AddScoped<EmploymentCheckRequestFactory>();
         services.AddScoped<IVerifyNotEmployedService, VerifyNotEmployedService>();
@@ -20,13 +27,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmploymentCheckStore, EmploymentCheckStore>();
         services.AddDbContext<EmploymentVerificationDbContext>(options =>
         {
-            // Functions exposes local.settings.json Values and deployed app settings as environment variables.
-            var connectionString = configuration["SqlConnectionString"];
-            if (string.IsNullOrWhiteSpace(connectionString))
-            {
-                throw new InvalidOperationException("The SqlConnectionString setting is required for employment verification persistence.");
-            }
-
             options.UseSqlServer(connectionString);
         });
 
