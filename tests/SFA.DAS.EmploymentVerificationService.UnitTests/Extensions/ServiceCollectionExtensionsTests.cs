@@ -3,14 +3,17 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Moq;
+using Azure.Messaging.ServiceBus;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Mapping;
 using SFA.DAS.EmploymentVerificationService.Application.Persistence;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
 using SFA.DAS.EmploymentVerificationService.Data;
-using SFA.DAS.EmploymentVerificationService.Functions.Extensions;
+using SFA.DAS.EmploymentVerificationService.Application.Extensions;
+using SFA.DAS.EmploymentVerificationService.Data.Extensions;
+using SFA.DAS.EmploymentVerificationService.Infrastructure.Extensions;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Clients;
+using SFA.DAS.EmploymentVerificationService.Infrastructure.Services;
 
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Extensions;
 
@@ -18,15 +21,19 @@ namespace SFA.DAS.EmploymentVerificationService.UnitTests.Extensions;
 [NonParallelizable]
 public class ServiceCollectionExtensionsTests
 {
+    private const string BusConnection = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=dGVzdA==;UseDevelopmentEmulator=true;";
     private const string ConnectionString = "Server=localhost;Database=RegistrationTests;Integrated Security=true;TrustServerCertificate=true";
 
     [Test]
-    public void AddEmploymentVerification_RegistersScopedServicesAndSystemClock()
+    public void Registrations_RegistersScopedServicesAndSystemClock()
     {
         var services = CreateServices(ConnectionString);
         AssertRegistration<IVerifyNotEmployedService, VerifyNotEmployedService>(services);
         AssertRegistration<IEmploymentCheckCompletionService, EmploymentCheckCompletionService>(services);
         AssertRegistration<IEmploymentCheckStore, EmploymentCheckStore>(services);
+        AssertRegistration<IEmploymentVerificationPublisher, EmploymentVerificationPublisher>(services);
+        Assert.That(services.Single(x => x.ServiceType == typeof(ServiceBusClient)).Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
+        Assert.That(services.Single(x => x.ServiceType == typeof(ServiceBusSender)).Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
         AssertRegistration<IEmploymentCheckClient, MockEmploymentCheckClient>(services);
         AssertRegistration<EmploymentCheckRequestFactory, EmploymentCheckRequestFactory>(services);
         Assert.That(services.Single(x => x.ServiceType == typeof(EmploymentVerificationDbContext)).Lifetime,
@@ -38,7 +45,7 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Test]
-    public void AddEmploymentVerification_SharesDependenciesWithinScopeAndSeparatesInvocations()
+    public void Registrations_SharesDependenciesWithinScopeAndSeparatesInvocations()
     {
         using var provider = CreateServices(ConnectionString)
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
@@ -66,7 +73,7 @@ public class ServiceCollectionExtensionsTests
     [TestCase("")]
     [TestCase(" ")]
     [TestCase("\t\r\n")]
-    public void AddEmploymentVerification_RejectsMissingOrBlankSqlSettingDuringRegistration(string? value)
+    public void Registrations_RejectsMissingOrBlankSqlSettingDuringRegistration(string? value)
     {
         var failure = Assert.Throws<InvalidOperationException>(() => CreateServices(value));
 
@@ -74,7 +81,7 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Test]
-    public void AddEmploymentVerification_AllowsValidSqlSettingDuringRegistration()
+    public void Registrations_AllowsValidSqlSettingDuringRegistration()
     {
         Assert.DoesNotThrow(() => CreateServices(ConnectionString));
     }
@@ -90,7 +97,7 @@ public class ServiceCollectionExtensionsTests
         var builder = new HostBuilder()
             .UseEnvironment(Environments.Development)
             .ConfigureFunctionsWorkerDefaults()
-            .ConfigureServices((_, services) => services.AddEmploymentVerification(configuration));
+            .ConfigureServices((_, services) => services.AddApplication().AddData(configuration).AddInfrastructure(configuration));
 
         var failure = Assert.Throws<InvalidOperationException>(() =>
         {
@@ -98,19 +105,6 @@ public class ServiceCollectionExtensionsTests
         });
 
         Assert.That(failure!.Message, Does.Contain("SqlConnectionString"));
-    }
-
-    [TestCase(typeof(IEmploymentCheckCompletionService), typeof(IEmploymentVerificationPublisher))]
-    public void AddEmploymentVerification_LeavesUnimplementedDependenciesUnregistered(Type serviceType, Type missingType)
-    {
-        var services = CreateServices(ConnectionString);
-        Assert.That(services.Any(x => x.ServiceType == missingType), Is.False);
-        using var provider = services.BuildServiceProvider();
-        using var scope = provider.CreateScope();
-
-        var failure = Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService(serviceType));
-
-        Assert.That(failure!.Message, Does.Contain(missingType.FullName));
     }
 
     [Test]
@@ -125,8 +119,8 @@ public class ServiceCollectionExtensionsTests
                 .ConfigureFunctionsWorkerDefaults()
                 .ConfigureServices((context, services) =>
                 {
-                    services.AddSingleton(Mock.Of<IEmploymentVerificationPublisher>());
-                    services.AddEmploymentVerification(context.Configuration);
+                    services.AddApplication().AddData(context.Configuration).AddInfrastructure(new ConfigurationBuilder()
+                        .AddInMemoryCollection(PublisherSettings()).AddConfiguration(context.Configuration).Build());
                 })
                 .Build();
             using var scope = host.Services.CreateScope();
@@ -138,6 +132,46 @@ public class ServiceCollectionExtensionsTests
             Environment.SetEnvironmentVariable("SqlConnectionString", previous);
         }
     }
+
+    [TestCase("ServiceBusConnection", null)]
+    [TestCase("ServiceBusConnection", "")]
+    [TestCase("ServiceBusConnection", " \t")]
+    [TestCase("VerifyNotEmployedCompletedEntityName", null)]
+    [TestCase("VerifyNotEmployedCompletedEntityName", "")]
+    [TestCase("VerifyNotEmployedCompletedEntityName", " \t")]
+    public void Registrations_RejectsMissingPublisherSettings(string key, string? value)
+    {
+        var settings = PublisherSettings();
+        settings[key] = value;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var failure = Assert.Throws<InvalidOperationException>(() =>
+            new ServiceCollection().AddInfrastructure(configuration));
+        Assert.That(failure!.Message, Does.Contain(key));
+    }
+
+    [Test]
+    public async Task Registrations_ReusesBusResourcesAcrossPublisherScopes()
+    {
+        await using var provider = CreateServices(ConnectionString).BuildServiceProvider();
+        using var first = provider.CreateScope();
+        using var second = provider.CreateScope();
+        var publisher = first.ServiceProvider.GetRequiredService<IEmploymentVerificationPublisher>();
+        Assert.That(publisher, Is.TypeOf<EmploymentVerificationPublisher>());
+        Assert.That(publisher, Is.SameAs(first.ServiceProvider.GetRequiredService<IEmploymentVerificationPublisher>()));
+        Assert.That(publisher, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<IEmploymentVerificationPublisher>()));
+        Assert.That(first.ServiceProvider.GetRequiredService<ServiceBusSender>(),
+            Is.SameAs(second.ServiceProvider.GetRequiredService<ServiceBusSender>()));
+        Assert.That(first.ServiceProvider.GetRequiredService<ServiceBusClient>(),
+            Is.SameAs(second.ServiceProvider.GetRequiredService<ServiceBusClient>()));
+        Assert.That(first.ServiceProvider.GetRequiredService<IEmploymentCheckCompletionService>(), Is.Not.Null);
+    }
+
+    private static Dictionary<string, string?> PublisherSettings(string? sqlConnection = ConnectionString) => new()
+    {
+        ["SqlConnectionString"] = sqlConnection,
+        ["ServiceBusConnection"] = BusConnection,
+        ["VerifyNotEmployedCompletedEntityName"] = "registration-tests"
+    };
 
     private static void AssertConnectionString(EmploymentVerificationDbContext context)
     {
@@ -153,8 +187,8 @@ public class ServiceCollectionExtensionsTests
     private static IServiceCollection CreateServices(string? connectionString)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?> { ["SqlConnectionString"] = connectionString }).Build();
-        return new ServiceCollection().AddLogging().AddEmploymentVerification(configuration);
+            PublisherSettings(connectionString)).Build();
+        return new ServiceCollection().AddLogging().AddApplication().AddData(configuration).AddInfrastructure(configuration);
     }
 
     private static void AssertRegistration<TService, TImplementation>(IServiceCollection services)
