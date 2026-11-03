@@ -12,7 +12,7 @@ namespace SFA.DAS.EmploymentVerificationService.Application.UnitTests.Services;
 [TestFixture]
 public class VerifyNotEmployedServiceTests
 {
-    private Mock<IEmploymentCheckStore> store = null!;
+    private Mock<IEmploymentCheckRepository> repository = null!;
     private Mock<IEmploymentCheckClient> client = null!;
     private EmploymentCheckRequestFactory factory = null!;
     private VerifyNotEmployedService service = null!;
@@ -21,10 +21,10 @@ public class VerifyNotEmployedServiceTests
     [SetUp]
     public void SetUp()
     {
-        store = new Mock<IEmploymentCheckStore>(MockBehavior.Strict);
+        repository = new Mock<IEmploymentCheckRepository>(MockBehavior.Strict);
         client = new Mock<IEmploymentCheckClient>(MockBehavior.Strict);
         factory = new EmploymentCheckRequestFactory(new FixedTimeProvider());
-        service = new VerifyNotEmployedService(store.Object, factory, client.Object, NullLogger<VerifyNotEmployedService>.Instance);
+        service = new VerifyNotEmployedService(repository.Object, factory, client.Object, NullLogger<VerifyNotEmployedService>.Instance);
         command = new VerifyNotEmployed
         {
             CorrelationId = Guid.NewGuid(),
@@ -43,8 +43,8 @@ public class VerifyNotEmployedServiceTests
         var expected = factory.Create(command);
         EmploymentCheckRequest? saved = null;
         var saveCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        store.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
-        store.Setup(x => x.SaveRequestAsync(expected, CancellationToken.None))
+        repository.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
+        repository.Setup(x => x.SaveRequestAsync(expected, CancellationToken.None))
             .Callback<EmploymentCheckRequest, CancellationToken>((request, _) => saved = request)
             .Returns(saveCompleted.Task);
         client.Setup(x => x.SendAsync(expected, CancellationToken.None))
@@ -58,19 +58,19 @@ public class VerifyNotEmployedServiceTests
         saveCompleted.SetResult();
         await processing;
 
-        store.Verify(x => x.SaveRequestAsync(expected, CancellationToken.None), Times.Once);
+        repository.Verify(x => x.SaveRequestAsync(expected, CancellationToken.None), Times.Once);
         client.Verify(x => x.SendAsync(expected, CancellationToken.None), Times.Once);
     }
 
     [Test]
     public async Task ProcessAsync_IgnoresExistingRequest()
     {
-        store.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(true);
+        repository.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(true);
 
         await service.ProcessAsync(command, CancellationToken.None);
 
-        store.Verify(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None), Times.Once);
-        store.VerifyNoOtherCalls();
+        repository.Verify(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None), Times.Once);
+        repository.VerifyNoOtherCalls();
         client.VerifyNoOtherCalls();
     }
 
@@ -80,13 +80,13 @@ public class VerifyNotEmployedServiceTests
         using var source = new CancellationTokenSource();
         var token = source.Token;
         var expected = factory.Create(command);
-        store.Setup(x => x.ExistsAsync(command.CorrelationId, token)).ReturnsAsync(false);
-        store.Setup(x => x.SaveRequestAsync(expected, token)).Returns(Task.CompletedTask);
+        repository.Setup(x => x.ExistsAsync(command.CorrelationId, token)).ReturnsAsync(false);
+        repository.Setup(x => x.SaveRequestAsync(expected, token)).Returns(Task.CompletedTask);
         client.Setup(x => x.SendAsync(expected, token)).Returns(Task.CompletedTask);
 
         await service.ProcessAsync(command, token);
 
-        store.VerifyAll();
+        repository.VerifyAll();
         client.VerifyAll();
     }
 
@@ -98,7 +98,7 @@ public class VerifyNotEmployedServiceTests
 
         Assert.ThrowsAsync<OperationCanceledException>(() => service.ProcessAsync(command, source.Token));
 
-        store.VerifyNoOtherCalls();
+        repository.VerifyNoOtherCalls();
         client.VerifyNoOtherCalls();
     }
 
@@ -106,8 +106,8 @@ public class VerifyNotEmployedServiceTests
     public void ProcessAsync_SaveFailurePreventsSend()
     {
         var failure = new InvalidOperationException("Save failed");
-        store.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
-        store.Setup(x => x.SaveRequestAsync(factory.Create(command), CancellationToken.None)).ThrowsAsync(failure);
+        repository.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
+        repository.Setup(x => x.SaveRequestAsync(factory.Create(command), CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(command, CancellationToken.None));
 

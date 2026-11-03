@@ -6,7 +6,7 @@ using SFA.DAS.EmploymentVerificationService.Messages.Learner.Events;
 namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 
 public sealed class EmploymentCheckCompletionService(
-    IEmploymentCheckStore store,
+    IEmploymentCheckRepository repository,
     IEmploymentVerificationPublisher publisher,
     TimeProvider timeProvider,
     ILogger<EmploymentCheckCompletionService> logger) : IEmploymentCheckCompletionService
@@ -15,7 +15,7 @@ public sealed class EmploymentCheckCompletionService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var request = await store.GetRequestAsync(result.CorrelationId, cancellationToken);
+        var request = await repository.GetRequestAsync(result.CorrelationId, cancellationToken);
         if (request is null)
         {
             logger.LogWarning("No matching request found for {CorrelationId}", result.CorrelationId);
@@ -27,7 +27,7 @@ public sealed class EmploymentCheckCompletionService(
             throw new InvalidOperationException("Employment check failure processing is not implemented.");
         }
 
-        await store.RecordCompletionAsync(new EmploymentCheckCompletion(
+        await repository.RecordCompletionAsync(new EmploymentCheckCompletion(
             request.CorrelationId,
             employed,
             (byte)EmploymentCheckStatus.Completed,

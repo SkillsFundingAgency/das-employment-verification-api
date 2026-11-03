@@ -12,7 +12,7 @@ namespace SFA.DAS.EmploymentVerificationService.Application.UnitTests.Services;
 public class EmploymentCheckCompletionServiceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 29, 12, 34, 56, TimeSpan.Zero);
-    private Mock<IEmploymentCheckStore> store = null!;
+    private Mock<IEmploymentCheckRepository> repository = null!;
     private Mock<IEmploymentVerificationPublisher> publisher = null!;
     private EmploymentCheckCompletionService service = null!;
     private EmploymentCheckRequest request = null!;
@@ -21,9 +21,9 @@ public class EmploymentCheckCompletionServiceTests
     [SetUp]
     public void SetUp()
     {
-        store = new Mock<IEmploymentCheckStore>(MockBehavior.Strict);
+        repository = new Mock<IEmploymentCheckRepository>(MockBehavior.Strict);
         publisher = new Mock<IEmploymentVerificationPublisher>(MockBehavior.Strict);
-        service = new EmploymentCheckCompletionService(store.Object, publisher.Object, new FixedTimeProvider(), NullLogger<EmploymentCheckCompletionService>.Instance);
+        service = new EmploymentCheckCompletionService(repository.Object, publisher.Object, new FixedTimeProvider(), NullLogger<EmploymentCheckCompletionService>.Instance);
         request = new EmploymentCheckRequest(Guid.NewGuid(), 1234567890, 456, 789, "reference",
             new DateTime(2026, 1, 1), new DateTime(2026, 3, 2), 1,
             (byte)EmploymentCheckStatus.InProgress, new DateTime(2026, 1, 1));
@@ -38,8 +38,8 @@ public class EmploymentCheckCompletionServiceTests
         request = request with { ApprenticeshipId = apprenticeshipId };
         result = result with { EmploymentResult = employed };
         var expected = new EmploymentCheckCompletion(request.CorrelationId, employed, 2, Now.UtcDateTime);
-        store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
-        store.Setup(x => x.RecordCompletionAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
+        repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
+        repository.Setup(x => x.RecordCompletionAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.Is<VerifyNotEmployedCompleted>(message =>
             message.CorrelationId == request.CorrelationId &&
             message.ULN == request.ULN &&
@@ -49,7 +49,7 @@ public class EmploymentCheckCompletionServiceTests
 
         await service.ProcessAsync(result, CancellationToken.None);
 
-        store.VerifyAll();
+        repository.VerifyAll();
         publisher.VerifyAll();
     }
 
@@ -57,8 +57,8 @@ public class EmploymentCheckCompletionServiceTests
     public async Task ProcessAsync_RecordsCurrentUtcTimeInsteadOfIncomingCheckDate()
     {
         EmploymentCheckCompletion? recorded = null;
-        store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
-        store.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None))
+        repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
+        repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None))
             .Callback<EmploymentCheckCompletion, CancellationToken>((completion, _) => recorded = completion)
             .Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None)).Returns(Task.CompletedTask);
@@ -78,13 +78,13 @@ public class EmploymentCheckCompletionServiceTests
     [Test]
     public async Task ProcessAsync_IgnoresUnmatchedCorrelationId()
     {
-        store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None))
+        repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None))
             .ReturnsAsync((EmploymentCheckRequest?)null);
 
         await service.ProcessAsync(result, CancellationToken.None);
 
-        store.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);
-        store.VerifyNoOtherCalls();
+        repository.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);
+        repository.VerifyNoOtherCalls();
         publisher.VerifyNoOtherCalls();
     }
 
@@ -92,8 +92,8 @@ public class EmploymentCheckCompletionServiceTests
     public async Task ProcessAsync_AwaitsPersistenceBeforePublishing()
     {
         var saved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
-        store.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None)).Returns(saved.Task);
+        repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
+        repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None)).Returns(saved.Task);
         publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None)).Returns(Task.CompletedTask);
 
         var processing = service.ProcessAsync(result, CancellationToken.None);
@@ -109,8 +109,8 @@ public class EmploymentCheckCompletionServiceTests
     public void ProcessAsync_PersistenceFailurePreventsPublishing()
     {
         var failure = new InvalidOperationException("Save failed");
-        store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
-        store.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None)).ThrowsAsync(failure);
+        repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
+        repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(result, CancellationToken.None));
 
@@ -123,13 +123,13 @@ public class EmploymentCheckCompletionServiceTests
     {
         using var source = new CancellationTokenSource();
         var token = source.Token;
-        store.Setup(x => x.GetRequestAsync(result.CorrelationId, token)).ReturnsAsync(request);
-        store.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), token)).Returns(Task.CompletedTask);
+        repository.Setup(x => x.GetRequestAsync(result.CorrelationId, token)).ReturnsAsync(request);
+        repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), token)).Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), token)).Returns(Task.CompletedTask);
 
         await service.ProcessAsync(result, token);
 
-        store.VerifyAll();
+        repository.VerifyAll();
         publisher.VerifyAll();
     }
 
@@ -141,7 +141,7 @@ public class EmploymentCheckCompletionServiceTests
 
         Assert.ThrowsAsync<OperationCanceledException>(() => service.ProcessAsync(result, source.Token));
 
-        store.VerifyNoOtherCalls();
+        repository.VerifyNoOtherCalls();
         publisher.VerifyNoOtherCalls();
     }
 
@@ -152,12 +152,12 @@ public class EmploymentCheckCompletionServiceTests
     public void ProcessAsync_RejectsUnsupportedFailureWithoutSavingOrPublishing(bool? employed, string? errorType)
     {
         result = result with { EmploymentResult = employed, ErrorType = errorType };
-        store.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
+        repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
 
         Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(result, CancellationToken.None));
 
-        store.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);
-        store.VerifyNoOtherCalls();
+        repository.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);
+        repository.VerifyNoOtherCalls();
         publisher.VerifyNoOtherCalls();
     }
     private sealed class FixedTimeProvider : TimeProvider

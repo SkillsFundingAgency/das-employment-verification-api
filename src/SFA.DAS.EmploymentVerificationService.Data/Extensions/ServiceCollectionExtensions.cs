@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException("The SqlConnectionString setting is required for employment verification persistence.");
         }
 
-        services.AddScoped<IEmploymentCheckStore, EmploymentCheckStore>();
+        services.AddScoped<IEmploymentCheckRepository, EmploymentCheckRepository>();
         services.AddDbContext<EmploymentVerificationDbContext>(options =>
         {
             options.UseSqlServer(connectionString);

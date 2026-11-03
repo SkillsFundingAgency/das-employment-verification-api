@@ -30,7 +30,7 @@ public class ServiceCollectionExtensionsTests
         var services = CreateServices(ConnectionString);
         AssertRegistration<IVerifyNotEmployedService, VerifyNotEmployedService>(services);
         AssertRegistration<IEmploymentCheckCompletionService, EmploymentCheckCompletionService>(services);
-        AssertRegistration<IEmploymentCheckStore, EmploymentCheckStore>(services);
+        AssertRegistration<IEmploymentCheckRepository, EmploymentCheckRepository>(services);
         AssertRegistration<IEmploymentVerificationPublisher, EmploymentVerificationPublisher>(services);
         Assert.That(services.Single(x => x.ServiceType == typeof(ServiceBusClient)).Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
         Assert.That(services.Single(x => x.ServiceType == typeof(ServiceBusSender)).Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
@@ -41,7 +41,7 @@ public class ServiceCollectionExtensionsTests
 
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         Assert.That(provider.GetRequiredService<TimeProvider>(), Is.SameAs(TimeProvider.System));
-        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IEmploymentCheckStore>());
+        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IEmploymentCheckRepository>());
     }
 
     [Test]
@@ -52,15 +52,15 @@ public class ServiceCollectionExtensionsTests
         using var first = provider.CreateScope();
         using var second = provider.CreateScope();
         var context = first.ServiceProvider.GetRequiredService<EmploymentVerificationDbContext>();
-        var store = first.ServiceProvider.GetRequiredService<IEmploymentCheckStore>();
+        var repository = first.ServiceProvider.GetRequiredService<IEmploymentCheckRepository>();
 
         Assert.That(context.Database.ProviderName, Is.EqualTo("Microsoft.EntityFrameworkCore.SqlServer"));
         AssertConnectionString(context);
         Assert.That(context, Is.SameAs(first.ServiceProvider.GetRequiredService<EmploymentVerificationDbContext>()));
         Assert.That(context, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<EmploymentVerificationDbContext>()));
-        Assert.That(store, Is.TypeOf<EmploymentCheckStore>());
-        Assert.That(store, Is.SameAs(first.ServiceProvider.GetRequiredService<IEmploymentCheckStore>()));
-        Assert.That(store, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<IEmploymentCheckStore>()));
+        Assert.That(repository, Is.TypeOf<EmploymentCheckRepository>());
+        Assert.That(repository, Is.SameAs(first.ServiceProvider.GetRequiredService<IEmploymentCheckRepository>()));
+        Assert.That(repository, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<IEmploymentCheckRepository>()));
         Assert.That(first.ServiceProvider.GetRequiredService<EmploymentCheckRequestFactory>(), Is.Not.Null);
         var client = first.ServiceProvider.GetRequiredService<IEmploymentCheckClient>();
         Assert.That(client, Is.TypeOf<MockEmploymentCheckClient>());

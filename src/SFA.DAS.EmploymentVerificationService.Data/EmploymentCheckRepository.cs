@@ -6,7 +6,7 @@ using ResponseEntity = SFA.DAS.EmploymentVerificationService.Data.Entities.Emplo
 
 namespace SFA.DAS.EmploymentVerificationService.Data;
 
-public class EmploymentCheckStore(EmploymentVerificationDbContext context) : IEmploymentCheckStore
+public class EmploymentCheckRepository(EmploymentVerificationDbContext context) : IEmploymentCheckRepository
 {
     public Task<bool> ExistsAsync(Guid correlationId, CancellationToken cancellationToken)
     {

@@ -2,7 +2,7 @@ using SFA.DAS.EmploymentVerificationService.Application.Models;
 
 namespace SFA.DAS.EmploymentVerificationService.Application.Persistence;
 
-public interface IEmploymentCheckStore
+public interface IEmploymentCheckRepository
 {
     Task<bool> ExistsAsync(Guid correlationId, CancellationToken cancellationToken);
 

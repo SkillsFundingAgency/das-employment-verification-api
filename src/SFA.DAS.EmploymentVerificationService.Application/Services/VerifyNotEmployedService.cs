@@ -6,7 +6,7 @@ using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 
 public sealed class VerifyNotEmployedService(
-    IEmploymentCheckStore store,
+    IEmploymentCheckRepository repository,
     EmploymentCheckRequestFactory requestFactory,
     IEmploymentCheckClient client,
     ILogger<VerifyNotEmployedService> logger) : IVerifyNotEmployedService
@@ -15,14 +15,14 @@ public sealed class VerifyNotEmployedService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (await store.ExistsAsync(command.CorrelationId, cancellationToken))
+        if (await repository.ExistsAsync(command.CorrelationId, cancellationToken))
         {
             logger.LogInformation("Existing request ignored for {CorrelationId}", command.CorrelationId);
             return;
         }
 
         var request = requestFactory.Create(command);
-        await store.SaveRequestAsync(request, cancellationToken);
+        await repository.SaveRequestAsync(request, cancellationToken);
         logger.LogInformation("New request persisted for {CorrelationId}", command.CorrelationId);
         await client.SendAsync(request, cancellationToken);
         logger.LogInformation("Employment Check API submission completed for {CorrelationId}", command.CorrelationId);
