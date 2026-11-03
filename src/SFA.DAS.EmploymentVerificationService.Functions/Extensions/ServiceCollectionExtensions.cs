@@ -5,6 +5,7 @@ using SFA.DAS.EmploymentVerificationService.Application.Mapping;
 using SFA.DAS.EmploymentVerificationService.Application.Persistence;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
 using SFA.DAS.EmploymentVerificationService.Data;
+using SFA.DAS.EmploymentVerificationService.Infrastructure.Clients;
 
 namespace SFA.DAS.EmploymentVerificationService.Functions.Extensions;
 
@@ -20,6 +21,9 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException("The SqlConnectionString setting is required for employment verification persistence.");
         }
 
+        // TODO: Replace with the real EmploymentCheckClient before deployment.
+        services.AddScoped<IEmploymentCheckClient, MockEmploymentCheckClient>();
+
         services.AddSingleton<TimeProvider>(TimeProvider.System);
         services.AddScoped<EmploymentCheckRequestFactory>();
         services.AddScoped<IVerifyNotEmployedService, VerifyNotEmployedService>();
@@ -30,7 +34,7 @@ public static class ServiceCollectionExtensions
             options.UseSqlServer(connectionString);
         });
 
-        // IEmploymentCheckClient and IEmploymentVerificationPublisher await concrete implementations.
+        // IEmploymentVerificationPublisher awaits a concrete implementation.
         return services;
     }
 }

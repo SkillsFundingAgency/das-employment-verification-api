@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="../SFA.DAS.EmploymentVerificationService.Application/SFA.DAS.EmploymentVerificationService.Application.csproj" />
     <ProjectReference Include="../SFA.DAS.EmploymentVerificationService.Data/SFA.DAS.EmploymentVerificationService.Data.csproj" />
+    <ProjectReference Include="../SFA.DAS.EmploymentVerificationService.Infrastructure/SFA.DAS.EmploymentVerificationService.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

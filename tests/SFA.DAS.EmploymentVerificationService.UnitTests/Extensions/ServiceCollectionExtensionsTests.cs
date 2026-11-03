@@ -3,12 +3,14 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Mapping;
 using SFA.DAS.EmploymentVerificationService.Application.Persistence;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
 using SFA.DAS.EmploymentVerificationService.Data;
 using SFA.DAS.EmploymentVerificationService.Functions.Extensions;
+using SFA.DAS.EmploymentVerificationService.Infrastructure.Clients;
 
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Extensions;
 
@@ -25,6 +27,7 @@ public class ServiceCollectionExtensionsTests
         AssertRegistration<IVerifyNotEmployedService, VerifyNotEmployedService>(services);
         AssertRegistration<IEmploymentCheckCompletionService, EmploymentCheckCompletionService>(services);
         AssertRegistration<IEmploymentCheckStore, EmploymentCheckStore>(services);
+        AssertRegistration<IEmploymentCheckClient, MockEmploymentCheckClient>(services);
         AssertRegistration<EmploymentCheckRequestFactory, EmploymentCheckRequestFactory>(services);
         Assert.That(services.Single(x => x.ServiceType == typeof(EmploymentVerificationDbContext)).Lifetime,
             Is.EqualTo(ServiceLifetime.Scoped));
@@ -52,6 +55,11 @@ public class ServiceCollectionExtensionsTests
         Assert.That(store, Is.SameAs(first.ServiceProvider.GetRequiredService<IEmploymentCheckStore>()));
         Assert.That(store, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<IEmploymentCheckStore>()));
         Assert.That(first.ServiceProvider.GetRequiredService<EmploymentCheckRequestFactory>(), Is.Not.Null);
+        var client = first.ServiceProvider.GetRequiredService<IEmploymentCheckClient>();
+        Assert.That(client, Is.TypeOf<MockEmploymentCheckClient>());
+        Assert.That(client, Is.SameAs(first.ServiceProvider.GetRequiredService<IEmploymentCheckClient>()));
+        Assert.That(client, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<IEmploymentCheckClient>()));
+        Assert.That(first.ServiceProvider.GetRequiredService<IVerifyNotEmployedService>(), Is.TypeOf<VerifyNotEmployedService>());
     }
 
     [TestCase(null)]
@@ -80,6 +88,7 @@ public class ServiceCollectionExtensionsTests
             value is null ? new Dictionary<string, string?>() :
                 new Dictionary<string, string?> { ["SqlConnectionString"] = value }).Build();
         var builder = new HostBuilder()
+            .UseEnvironment(Environments.Development)
             .ConfigureFunctionsWorkerDefaults()
             .ConfigureServices((_, services) => services.AddEmploymentVerification(configuration));
 
@@ -91,7 +100,6 @@ public class ServiceCollectionExtensionsTests
         Assert.That(failure!.Message, Does.Contain("SqlConnectionString"));
     }
 
-    [TestCase(typeof(IVerifyNotEmployedService), typeof(IEmploymentCheckClient))]
     [TestCase(typeof(IEmploymentCheckCompletionService), typeof(IEmploymentVerificationPublisher))]
     public void AddEmploymentVerification_LeavesUnimplementedDependenciesUnregistered(Type serviceType, Type missingType)
     {
@@ -113,8 +121,13 @@ public class ServiceCollectionExtensionsTests
         {
             Environment.SetEnvironmentVariable("SqlConnectionString", ConnectionString);
             using var host = new HostBuilder()
+                .UseEnvironment(Environments.Development)
                 .ConfigureFunctionsWorkerDefaults()
-                .ConfigureServices((context, services) => services.AddEmploymentVerification(context.Configuration))
+                .ConfigureServices((context, services) =>
+                {
+                    services.AddSingleton(Mock.Of<IEmploymentVerificationPublisher>());
+                    services.AddEmploymentVerification(context.Configuration);
+                })
                 .Build();
             using var scope = host.Services.CreateScope();
 
@@ -141,7 +154,7 @@ public class ServiceCollectionExtensionsTests
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(
             new Dictionary<string, string?> { ["SqlConnectionString"] = connectionString }).Build();
-        return new ServiceCollection().AddEmploymentVerification(configuration);
+        return new ServiceCollection().AddLogging().AddEmploymentVerification(configuration);
     }
 
     private static void AssertRegistration<TService, TImplementation>(IServiceCollection services)
