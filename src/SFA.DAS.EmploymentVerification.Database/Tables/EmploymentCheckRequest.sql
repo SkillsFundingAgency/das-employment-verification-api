@@ -1,0 +1,15 @@
+CREATE TABLE [EVS].[EmploymentCheckRequest]
+(
+  Id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_EmploymentCheckRequest PRIMARY KEY,
+  CorrelationId UNIQUEIDENTIFIER NOT NULL,
+  ULN BIGINT NOT NULL,
+  AccountId BIGINT NOT NULL,
+  ApprenticeshipId BIGINT NULL,
+  Reference NVARCHAR(255) NULL,
+  StartDate DATETIME2(7) NOT NULL,
+  EndDate DATETIME2(7) NOT NULL,
+  NumberOfAttempts INT NOT NULL,
+  Status TINYINT NOT NULL,
+  CreatedOn DATETIME2(7) NOT NULL
+);
+GO

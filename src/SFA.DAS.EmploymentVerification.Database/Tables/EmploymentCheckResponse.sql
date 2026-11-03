@@ -1,0 +1,8 @@
+CREATE TABLE [EVS].[EmploymentCheckResponse]
+(
+  Id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_EmploymentCheckResponse PRIMARY KEY,
+  CorrelationId UNIQUEIDENTIFIER NOT NULL,
+  Employed BIT NOT NULL,
+  CreatedOn DATETIME2(7) NOT NULL
+);
+GO

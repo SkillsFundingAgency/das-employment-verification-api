@@ -57,10 +57,12 @@
   <ItemGroup>
     <Folder Include="PostDeployment" />
     <Folder Include="Properties" />
+    <Folder Include="Schemas" />
     <Folder Include="Stored Procedures" />
     <Folder Include="Tables" />
   </ItemGroup>
   <ItemGroup>
+    <Build Include="Schemas\EVS.sql" />
     <Build Include="Stored Procedures\usp_LogError.sql" />
     <Build Include="Stored Procedures\usp_LogETLCounts.sql" />
     <Build Include="Stored Procedures\usp_UpsertLogETLJob.sql" />
@@ -69,6 +71,8 @@
     <Build Include="Tables\ApprovalsStatus.sql" />
     <Build Include="Tables\CheckType.sql" />
     <Build Include="Tables\CommitmentStatus.sql" />
+    <Build Include="Tables\EmploymentCheckRequest.sql" />
+    <Build Include="Tables\EmploymentCheckResponse.sql" />
     <Build Include="Tables\EmploymentVerification.sql" />
     <Build Include="Tables\LogError.sql" />
     <Build Include="Tables\LogETLCounts.sql" />
