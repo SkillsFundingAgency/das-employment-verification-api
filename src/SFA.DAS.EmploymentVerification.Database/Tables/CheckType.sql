@@ -1,0 +1,6 @@
+CREATE TABLE [dbo].[CheckType]
+(
+  CheckTypeId SMALLINT NOT NULL CONSTRAINT PK_CheckType PRIMARY KEY,
+  CheckType VARCHAR(20)
+);
+GO
