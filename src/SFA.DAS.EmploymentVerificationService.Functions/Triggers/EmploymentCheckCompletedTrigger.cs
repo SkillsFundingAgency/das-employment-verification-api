@@ -10,8 +10,7 @@ public class EmploymentCheckCompletedTrigger(IEmploymentCheckCompletionService s
 {
     [Function("EmploymentCheckCompleted")]
     public async Task Run(
-        // Placeholder setting key: the entity and subscription arrangement await design confirmation.
-        [ServiceBusTrigger("%EmploymentCheckCompletedQueueNamePlaceholder%", Connection = "ServiceBusConnection")]
+        [ServiceBusTrigger("%EmploymentCheckCompletedQueueName%", Connection = "ServiceBusConnection")]
         EmploymentCheckCompletedEvent message,
         FunctionContext context,
         CancellationToken cancellationToken)

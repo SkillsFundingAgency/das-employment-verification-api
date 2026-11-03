@@ -9,8 +9,7 @@ public class VerifyNotEmployedTrigger(IVerifyNotEmployedService service, ILogger
 {
     [Function("VerifyNotEmployed")]
     public async Task Run(
-        // Placeholder setting key: the actual queue entity is awaiting design confirmation.
-        [ServiceBusTrigger("%VerifyNotEmployedQueueNamePlaceholder%", Connection = "ServiceBusConnection")]
+        [ServiceBusTrigger("%VerifyNotEmployedQueueName%", Connection = "ServiceBusConnection")]
         VerifyNotEmployed command,
         FunctionContext context,
         CancellationToken cancellationToken)
