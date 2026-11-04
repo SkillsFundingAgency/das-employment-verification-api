@@ -15,27 +15,25 @@ public sealed record MessagingInfrastructureOptions(bool Enabled, IReadOnlyList<
 
     public static MessagingInfrastructureOptions Read(IConfiguration configuration)
     {
-        const string section = "MessagingInfrastructure";
-        var enabled = ReadFlag(configuration, $"{section}:Enabled");
+        var enabled = ReadFlag(configuration, "ServiceBusSetupEnabled");
         if (!enabled)
             return new(false, Array.Empty<MessagingRoute>());
 
-        if (!ReadFlag(configuration, $"{section}:FiltersReviewed"))
-            throw new InvalidOperationException("MessagingInfrastructure:FiltersReviewed must be true before enabling provisioning for both routes.");
+        if (!ReadFlag(configuration, "ServiceBusFiltersReviewed"))
+            throw new InvalidOperationException("ServiceBusFiltersReviewed must be true before enabling provisioning for both routes.");
 
         var routes = new[] { "VerifyNotEmployed", "EmploymentCheckCompleted" }.Select(name =>
         {
-            var prefix = $"{section}:{name}";
-            var filter = Required(configuration, $"{prefix}:SqlFilter");
+            var filter = Required(configuration, $"{name}Filter");
             var match = PropertyComparison.Match(filter);
             if (!match.Success || (match.Groups[1].Value.Equals("LIKE", StringComparison.OrdinalIgnoreCase)
                 && !match.Groups[2].Value.Any(char.IsLetterOrDigit)))
-                throw new InvalidOperationException($"{prefix}:SqlFilter must be a restrictive property = 'value' or property LIKE 'pattern' expression with a literal value. Compound SQL is not supported.");
+                throw new InvalidOperationException($"{name}Filter must be a restrictive property = 'value' or property LIKE 'pattern' expression with a literal value. Compound SQL is not supported.");
 
             return new MessagingRoute(
                 name == "EmploymentCheckCompleted" ? "EmploymentCheckCompletedEvent" : name,
-                Required(configuration, $"{prefix}:TopicName"),
-                Required(configuration, $"{prefix}:SubscriptionName"),
+                Required(configuration, $"{name}Topic"),
+                Required(configuration, $"{name}Subscription"),
                 Required(configuration, $"{name}QueueName"), filter);
         }).ToArray();
 

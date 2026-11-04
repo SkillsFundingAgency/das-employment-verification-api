@@ -14,8 +14,8 @@ EVS owns only the two incoming subscriptions and queues. The outgoing event does
 not require a third EVS subscription or queue; downstream consumers own their
 subscriptions and filters.
 
-Provisioning is disabled by default. No local settings or Azure entities are changed
-by this implementation. Do not enable it against the shared namespace until both
+Provisioning is disabled by default. Local settings keep setup and filter review
+disabled, and leave the unverified command filter empty. Do not enable setup against the shared namespace until both
 filters have been reviewed. The review flag records that external review; it does
 not verify publisher metadata.
 
@@ -40,19 +40,20 @@ Set the following incoming provisioning settings only after review:
 
 | Key | Meaning |
 | --- | --- |
-| `MessagingInfrastructure:Enabled` | Explicit opt-in; defaults to false |
-| `MessagingInfrastructure:FiltersReviewed` | Must explicitly be true when enabled; covers both filters |
-| `MessagingInfrastructure:VerifyNotEmployed:TopicName` | Command topic; `bundle-1` locally |
-| `MessagingInfrastructure:VerifyNotEmployed:SubscriptionName` | Dedicated EVS command subscription |
-| `MessagingInfrastructure:VerifyNotEmployed:SqlFilter` | Required reviewed command filter; no default |
+| `ServiceBusSetupEnabled` | Explicit opt-in; defaults to false |
+| `ServiceBusFiltersReviewed` | Must explicitly be true when enabled; covers both filters |
+| `VerifyNotEmployedTopic` | Command topic; `bundle-1` locally |
+| `VerifyNotEmployedSubscription` | Dedicated EVS command subscription |
+| `VerifyNotEmployedFilter` | Required reviewed command filter; no default |
 | `VerifyNotEmployedQueueName` | Existing command trigger queue setting |
-| `MessagingInfrastructure:EmploymentCheckCompleted:TopicName` | Completion topic; `bundle-1` locally |
-| `MessagingInfrastructure:EmploymentCheckCompleted:SubscriptionName` | Dedicated EVS completion subscription |
-| `MessagingInfrastructure:EmploymentCheckCompleted:SqlFilter` | Required completion filter shown below |
+| `EmploymentCheckCompletedTopic` | Completion topic; `bundle-1` locally |
+| `EmploymentCheckCompletedSubscription` | Dedicated EVS completion subscription |
+| `EmploymentCheckCompletedFilter` | Required completion filter shown below |
 | `EmploymentCheckCompletedQueueName` | Existing completion trigger queue setting |
 | `ServiceBusAdministrationConnection` | Optional Manage connection string; falls back to `ServiceBusConnection` |
 
-For Azure environment variables, replace `:` with `__`. The existing
+All configuration keys are flat and use the same names in local `Values` and Azure
+application settings; no section prefix or double underscores are needed. The existing
 `ServiceBusConnection` and `VerifyNotEmployedCompletedTopicName` publisher settings
 remain required. The two routes must use distinct queues and distinct subscription
 pairs. Forwarding destinations must be in the topic's namespace.
@@ -64,10 +65,37 @@ EVS subscription/queue names, reviewed filters and credentials through the exist
 environment configuration. The sender and triggers use `ServiceBusConnection`;
 the optional administration connection must point to the same namespace. Ensure
 that configuration and trigger queue names agree. Outgoing publishing works while
-incoming provisioning remains disabled. No local.settings.json is modified by this
-change; environments using the former outgoing setting must be migrated manually
-to `VerifyNotEmployedCompletedTopicName` before deployment. There is no fallback
-to the former key.
+incoming provisioning remains disabled. The local settings file contains the values
+below and preserves the existing storage, worker runtime, SQL and Service Bus
+connection values. Deployed environment settings must be migrated to these flat
+names; there is no fallback to the former nested keys or former outgoing setting.
+
+### Local settings
+
+| Key | Local value |
+| --- | --- |
+| `ServiceBusSetupEnabled` | `false` |
+| `ServiceBusFiltersReviewed` | `false` |
+| `VerifyNotEmployedTopic` | `bundle-1` |
+| `VerifyNotEmployedSubscription` | `sbts-evs-verify-not-employed-dev` |
+| `VerifyNotEmployedQueueName` | `sbq-evs-verify-not-employed-dev` |
+| `VerifyNotEmployedFilter` | Empty string until publisher metadata is confirmed |
+| `EmploymentCheckCompletedTopic` | `bundle-1` |
+| `EmploymentCheckCompletedSubscription` | `sbts-evs-employment-check-completed-dev` |
+| `EmploymentCheckCompletedQueueName` | `sbq-evs-employment-check-completed-dev` |
+| `EmploymentCheckCompletedFilter` | Verified SQL expression below |
+| `VerifyNotEmployedCompletedTopicName` | `bundle-1` |
+
+Keep the current `AzureWebJobsStorage`, `FUNCTIONS_WORKER_RUNTIME`,
+`SqlConnectionString` and `ServiceBusConnection` values unchanged. Connection
+values are intentionally omitted from this document. `ServiceBusAdministrationConnection`
+remains optional and falls back to `ServiceBusConnection` when absent.
+
+With setup disabled, provisioning route validation and hosted-service registration
+are skipped. The review flag alone never enables setup. Enabling setup requires
+explicit review and valid restrictive filters for both routes; the empty command
+filter must be resolved first. Existing trigger bindings still use the queue-name
+keys above, and no trigger or publisher implementation changes are required.
 
 The verified completion filter is:
 

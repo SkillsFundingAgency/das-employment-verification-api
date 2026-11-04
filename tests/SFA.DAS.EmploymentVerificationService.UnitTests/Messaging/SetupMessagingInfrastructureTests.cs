@@ -46,7 +46,7 @@ public class SetupMessagingInfrastructureTests
     public void EnabledWithoutReview_IsRejected(string? reviewed)
     {
         var settings = Settings();
-        settings["MessagingInfrastructure:FiltersReviewed"] = reviewed;
+        settings["ServiceBusFiltersReviewed"] = reviewed;
         Assert.Throws<InvalidOperationException>(() => MessagingInfrastructureOptions.Read(Config(settings)));
     }
 
@@ -60,7 +60,7 @@ public class SetupMessagingInfrastructureTests
     public void UnrestrictedOrUnsupportedCommandFilters_AreRejected(string filter)
     {
         var settings = Settings();
-        settings["MessagingInfrastructure:VerifyNotEmployed:SqlFilter"] = filter;
+        settings["VerifyNotEmployedFilter"] = filter;
         Assert.Throws<InvalidOperationException>(() => MessagingInfrastructureOptions.Read(Config(settings)));
     }
 
@@ -68,8 +68,45 @@ public class SetupMessagingInfrastructureTests
     public void MissingSecondRoute_IsRejectedBeforeAnyProvisioning()
     {
         var settings = Settings();
-        settings.Remove("MessagingInfrastructure:EmploymentCheckCompleted:SqlFilter");
+        settings.Remove("EmploymentCheckCompletedFilter");
         Assert.Throws<InvalidOperationException>(() => MessagingInfrastructureOptions.Read(Config(settings)));
+    }
+
+    [Test]
+    public void FlatKeys_MapBothRoutesIncludingIndependentTopics()
+    {
+        var settings = Settings();
+        settings["VerifyNotEmployedTopic"] = "command-topic";
+        settings["EmploymentCheckCompletedTopic"] = "completion-topic";
+
+        var options = MessagingInfrastructureOptions.Read(Config(settings));
+
+        Assert.That(options.Enabled, Is.True);
+        Assert.That(options.Routes, Is.EqualTo(new[]
+        {
+            new MessagingRoute("VerifyNotEmployed", "command-topic", "command-sub", "commands", "sys.Label = 'test-command'"),
+            new MessagingRoute("EmploymentCheckCompletedEvent", "completion-topic", "completion-sub", "completions", CompletionFilter)
+        }));
+    }
+
+    [TestCase("false")]
+    [TestCase("true")]
+    public void DisabledSetup_AllowsUnverifiedEmptyCommandFilterWithoutRegisteringAdministration(string reviewed)
+    {
+        var settings = Settings();
+        settings["ServiceBusSetupEnabled"] = "false";
+        settings["ServiceBusFiltersReviewed"] = reviewed;
+        settings["VerifyNotEmployedFilter"] = "";
+        settings["ServiceBusConnection"] = "not-used";
+        settings["VerifyNotEmployedCompletedTopicName"] = "bundle-1";
+
+        var options = MessagingInfrastructureOptions.Read(Config(settings));
+        var services = new ServiceCollection().AddInfrastructure(Config(settings));
+
+        Assert.That(options.Enabled, Is.False);
+        Assert.That(options.Routes, Is.Empty);
+        Assert.That(services.Any(x => x.ServiceType == typeof(ServiceBusAdministrationClient)), Is.False);
+        Assert.That(services.Any(x => x.ServiceType == typeof(IHostedService)), Is.False);
     }
 
     [Test]
@@ -209,17 +246,17 @@ public class SetupMessagingInfrastructureTests
 
     private static Dictionary<string, string?> Settings() => new()
     {
-        ["MessagingInfrastructure:Enabled"] = "true",
-        ["MessagingInfrastructure:FiltersReviewed"] = "true",
+        ["ServiceBusSetupEnabled"] = "true",
+        ["ServiceBusFiltersReviewed"] = "true",
         ["VerifyNotEmployedQueueName"] = "commands",
         ["EmploymentCheckCompletedQueueName"] = "completions",
-        ["MessagingInfrastructure:VerifyNotEmployed:TopicName"] = "bundle-1",
-        ["MessagingInfrastructure:VerifyNotEmployed:SubscriptionName"] = "command-sub",
+        ["VerifyNotEmployedTopic"] = "bundle-1",
+        ["VerifyNotEmployedSubscription"] = "command-sub",
         // Synthetic test metadata only; this is not a claim about the real command publisher.
-        ["MessagingInfrastructure:VerifyNotEmployed:SqlFilter"] = "sys.Label = 'test-command'",
-        ["MessagingInfrastructure:EmploymentCheckCompleted:TopicName"] = "bundle-1",
-        ["MessagingInfrastructure:EmploymentCheckCompleted:SubscriptionName"] = "completion-sub",
-        ["MessagingInfrastructure:EmploymentCheckCompleted:SqlFilter"] = CompletionFilter
+        ["VerifyNotEmployedFilter"] = "sys.Label = 'test-command'",
+        ["EmploymentCheckCompletedTopic"] = "bundle-1",
+        ["EmploymentCheckCompletedSubscription"] = "completion-sub",
+        ["EmploymentCheckCompletedFilter"] = CompletionFilter
     };
 
     private sealed class InMemoryAdministrationClient : ServiceBusAdministrationClient
