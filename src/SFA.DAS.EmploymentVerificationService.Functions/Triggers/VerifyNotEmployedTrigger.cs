@@ -11,19 +11,13 @@ public class VerifyNotEmployedTrigger(IVerifyNotEmployedService service, ILogger
     public async Task Run(
         [ServiceBusTrigger("%VerifyNotEmployedQueueName%", Connection = "ServiceBusConnection")]
         VerifyNotEmployed command,
-        FunctionContext context,
         CancellationToken cancellationToken)
     {
-        using var scope = logger.BeginScope(new Dictionary<string, object?>
-        {
-            ["CorrelationId"] = command.CorrelationId,
-            ["InvocationId"] = context.InvocationId
-        });
-        logger.LogInformation("VerifyNotEmployed processing started");
+        logger.LogInformation("VerifyNotEmployed processing started for {CorrelationId}", command.CorrelationId);
         try
         {
             await service.ProcessAsync(command, cancellationToken);
-            logger.LogInformation("VerifyNotEmployed processing completed");
+            logger.LogInformation("VerifyNotEmployed processing completed for {CorrelationId}", command.CorrelationId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -31,7 +25,7 @@ public class VerifyNotEmployedTrigger(IVerifyNotEmployedService service, ILogger
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "VerifyNotEmployed processing failed");
+            logger.LogError(exception, "VerifyNotEmployed processing failed for {CorrelationId}", command.CorrelationId);
             throw;
         }
     }

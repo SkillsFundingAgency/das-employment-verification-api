@@ -1,4 +1,3 @@
-using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
@@ -36,7 +35,7 @@ public class VerifyNotEmployedTriggerTests
             received.DurationInDays == duration && received.Reference == reference), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
-        await new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, Mock.Of<FunctionContext>(), CancellationToken.None);
+        await new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, CancellationToken.None);
 
         service.Verify(x => x.ProcessAsync(command, CancellationToken.None), Times.Once);
         service.VerifyNoOtherCalls();
@@ -50,7 +49,7 @@ public class VerifyNotEmployedTriggerTests
         var service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(command, source.Token)).Returns(Task.CompletedTask);
 
-        await new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, Mock.Of<FunctionContext>(), source.Token);
+        await new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, source.Token);
 
         service.Verify(x => x.ProcessAsync(command, source.Token), Times.Once);
     }
@@ -64,7 +63,7 @@ public class VerifyNotEmployedTriggerTests
         service.Setup(x => x.ProcessAsync(command, CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, Mock.Of<FunctionContext>(), CancellationToken.None));
+            new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }

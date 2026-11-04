@@ -12,15 +12,9 @@ public class EmploymentCheckCompletedTrigger(IEmploymentCheckCompletionService s
     public async Task Run(
         [ServiceBusTrigger("%EmploymentCheckCompletedQueueName%", Connection = "ServiceBusConnection")]
         EmploymentCheckCompletedEvent message,
-        FunctionContext context,
         CancellationToken cancellationToken)
     {
-        using var scope = logger.BeginScope(new Dictionary<string, object?>
-        {
-            ["CorrelationId"] = message.CorrelationId,
-            ["InvocationId"] = context.InvocationId
-        });
-        logger.LogInformation("EmploymentCheckCompleted processing started");
+        logger.LogInformation("EmploymentCheckCompleted processing started for {CorrelationId}", message.CorrelationId);
         try
         {
             await service.ProcessAsync(new EmploymentCheckResult(
@@ -28,7 +22,7 @@ public class EmploymentCheckCompletedTrigger(IEmploymentCheckCompletionService s
                 message.EmploymentResult,
                 message.CheckDate,
                 message.ErrorType), cancellationToken);
-            logger.LogInformation("EmploymentCheckCompleted processing completed");
+            logger.LogInformation("EmploymentCheckCompleted processing completed for {CorrelationId}", message.CorrelationId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -36,7 +30,7 @@ public class EmploymentCheckCompletedTrigger(IEmploymentCheckCompletionService s
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "EmploymentCheckCompleted processing failed");
+            logger.LogError(exception, "EmploymentCheckCompleted processing failed for {CorrelationId}", message.CorrelationId);
             throw;
         }
     }
