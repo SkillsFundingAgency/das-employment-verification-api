@@ -8,6 +8,7 @@
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../SFA.DAS.EmploymentVerificationService.Application/SFA.DAS.EmploymentVerificationService.Application.csproj" />

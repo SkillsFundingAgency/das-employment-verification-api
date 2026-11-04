@@ -6,9 +6,9 @@ using SFA.DAS.EmploymentVerificationService.Application.Services;
 
 namespace SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 
-public class EmploymentCheckCompletedTrigger(IEmploymentCheckCompletionService service, ILogger<EmploymentCheckCompletedTrigger> logger)
+public class EmploymentCheckCompletedServiceBusTrigger(IEmploymentCheckCompletionService service, ILogger<EmploymentCheckCompletedServiceBusTrigger> logger)
 {
-    [Function("EmploymentCheckCompleted")]
+    [Function(nameof(EmploymentCheckCompletedServiceBusTrigger))]
     public async Task Run(
         [ServiceBusTrigger("%EmploymentCheckCompletedQueueName%", Connection = "ServiceBusConnection")]
         EmploymentCheckCompletedEvent message,

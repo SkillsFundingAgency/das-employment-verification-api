@@ -5,15 +5,16 @@ using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 
 namespace SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 
-public class VerifyNotEmployedTrigger(IVerifyNotEmployedService service, ILogger<VerifyNotEmployedTrigger> logger)
+public class VerifyNotEmployedServiceBusTrigger(IVerifyNotEmployedService service, ILogger<VerifyNotEmployedServiceBusTrigger> logger)
 {
-    [Function("VerifyNotEmployed")]
+    [Function(nameof(VerifyNotEmployedServiceBusTrigger))]
     public async Task Run(
         [ServiceBusTrigger("%VerifyNotEmployedQueueName%", Connection = "ServiceBusConnection")]
         VerifyNotEmployed command,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("VerifyNotEmployed processing started for {CorrelationId}", command.CorrelationId);
+
         try
         {
             await service.ProcessAsync(command, cancellationToken);
@@ -30,3 +31,5 @@ public class VerifyNotEmployedTrigger(IVerifyNotEmployedService service, ILogger
         }
     }
 }
+//das-
+bundle1-1

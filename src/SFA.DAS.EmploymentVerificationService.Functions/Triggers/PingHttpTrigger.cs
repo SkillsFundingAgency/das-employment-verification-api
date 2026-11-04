@@ -6,7 +6,7 @@ namespace SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 
 public class PingHttpTrigger
 {
-    [Function("Ping")]
+    [Function(nameof(PingHttpTrigger))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ping")] HttpRequestData request)
     {

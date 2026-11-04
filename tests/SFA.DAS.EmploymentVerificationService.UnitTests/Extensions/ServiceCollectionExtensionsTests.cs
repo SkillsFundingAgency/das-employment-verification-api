@@ -136,9 +136,9 @@ public class ServiceCollectionExtensionsTests
     [TestCase("ServiceBusConnection", null)]
     [TestCase("ServiceBusConnection", "")]
     [TestCase("ServiceBusConnection", " \t")]
-    [TestCase("VerifyNotEmployedCompletedEntityName", null)]
-    [TestCase("VerifyNotEmployedCompletedEntityName", "")]
-    [TestCase("VerifyNotEmployedCompletedEntityName", " \t")]
+    [TestCase("VerifyNotEmployedCompletedTopicName", null)]
+    [TestCase("VerifyNotEmployedCompletedTopicName", "")]
+    [TestCase("VerifyNotEmployedCompletedTopicName", " \t")]
     public void Registrations_RejectsMissingPublisherSettings(string key, string? value)
     {
         var settings = PublisherSettings();
@@ -166,11 +166,25 @@ public class ServiceCollectionExtensionsTests
         Assert.That(first.ServiceProvider.GetRequiredService<IEmploymentCheckCompletionService>(), Is.Not.Null);
     }
 
+    [TestCase("bundle-1")]
+    [TestCase("environment-specific-events")]
+    public async Task Registrations_CreatesSenderForConfiguredOutgoingTopic(string topicName)
+    {
+        var settings = PublisherSettings();
+        settings["VerifyNotEmployedCompletedTopicName"] = topicName;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        await using var provider = new ServiceCollection().AddInfrastructure(configuration).BuildServiceProvider();
+
+        // Resolving a sender does not open a Service Bus connection or send a message.
+        var sender = provider.GetRequiredService<ServiceBusSender>();
+        Assert.That(sender.EntityPath, Is.EqualTo(topicName));
+    }
+
     private static Dictionary<string, string?> PublisherSettings(string? sqlConnection = ConnectionString) => new()
     {
         ["SqlConnectionString"] = sqlConnection,
         ["ServiceBusConnection"] = BusConnection,
-        ["VerifyNotEmployedCompletedEntityName"] = "registration-tests"
+        ["VerifyNotEmployedCompletedTopicName"] = "registration-tests"
     };
 
     private static void AssertConnectionString(EmploymentVerificationDbContext context)

@@ -14,7 +14,7 @@ using SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Triggers;
 
 [TestFixture]
-public class EmploymentCheckCompletedTriggerTests
+public class EmploymentCheckCompletedServiceBusTriggerTests
 {
     [TestCase("true", "", false)]
     [TestCase("false", "", false)]
@@ -51,7 +51,7 @@ public class EmploymentCheckCompletedTriggerTests
         var service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
 
-        await new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, CancellationToken.None);
+        await new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, CancellationToken.None);
 
         Assert.That(message.CheckDate.Kind, Is.EqualTo(DateTimeKind.Utc));
         service.Verify(x => x.ProcessAsync(expected, CancellationToken.None), Times.Once);
@@ -67,7 +67,7 @@ public class EmploymentCheckCompletedTriggerTests
         service.Setup(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token))
             .Returns(Task.CompletedTask);
 
-        await new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, source.Token);
+        await new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, source.Token);
 
         service.Verify(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token), Times.Once);
         service.VerifyNoOtherCalls();
@@ -83,7 +83,7 @@ public class EmploymentCheckCompletedTriggerTests
             .ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, CancellationToken.None));
+            new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
@@ -99,6 +99,6 @@ public class EmploymentCheckCompletedTriggerTests
             .Returns(Task.FromCanceled(source.Token));
 
         Assert.ThrowsAsync<TaskCanceledException>(() =>
-            new EmploymentCheckCompletedTrigger(service.Object, NullLogger<EmploymentCheckCompletedTrigger>.Instance).Run(message, source.Token));
+            new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, source.Token));
     }
 }

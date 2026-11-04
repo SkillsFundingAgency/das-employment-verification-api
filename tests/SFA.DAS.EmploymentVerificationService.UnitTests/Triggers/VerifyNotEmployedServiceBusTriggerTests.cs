@@ -8,7 +8,7 @@ using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Triggers;
 
 [TestFixture]
-public class VerifyNotEmployedTriggerTests
+public class VerifyNotEmployedServiceBusTriggerTests
 {
     [TestCase(30, 789L, "reference")]
     [TestCase(null, null, null)]
@@ -35,7 +35,7 @@ public class VerifyNotEmployedTriggerTests
             received.DurationInDays == duration && received.Reference == reference), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
-        await new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, CancellationToken.None);
+        await new VerifyNotEmployedServiceBusTrigger(service.Object, NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance).Run(command, CancellationToken.None);
 
         service.Verify(x => x.ProcessAsync(command, CancellationToken.None), Times.Once);
         service.VerifyNoOtherCalls();
@@ -49,7 +49,7 @@ public class VerifyNotEmployedTriggerTests
         var service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(command, source.Token)).Returns(Task.CompletedTask);
 
-        await new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, source.Token);
+        await new VerifyNotEmployedServiceBusTrigger(service.Object, NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance).Run(command, source.Token);
 
         service.Verify(x => x.ProcessAsync(command, source.Token), Times.Once);
     }
@@ -63,7 +63,7 @@ public class VerifyNotEmployedTriggerTests
         service.Setup(x => x.ProcessAsync(command, CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new VerifyNotEmployedTrigger(service.Object, NullLogger<VerifyNotEmployedTrigger>.Instance).Run(command, CancellationToken.None));
+            new VerifyNotEmployedServiceBusTrigger(service.Object, NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance).Run(command, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
