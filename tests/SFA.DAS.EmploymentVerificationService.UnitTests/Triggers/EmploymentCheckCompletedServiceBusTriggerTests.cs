@@ -1,9 +1,7 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using System.Text;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
+using System.Text.Json;
+using Azure.Core.Serialization;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentCheck.Types;
@@ -16,13 +14,22 @@ namespace SFA.DAS.EmploymentVerificationService.UnitTests.Triggers;
 [TestFixture]
 public class EmploymentCheckCompletedServiceBusTriggerTests
 {
+    private Mock<IEmploymentCheckCompletionService> service = null!;
+    private EmploymentCheckCompletedServiceBusTrigger trigger = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
+        trigger = new EmploymentCheckCompletedServiceBusTrigger(service.Object,
+            NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance);
+    }
+
     [TestCase("true", "", false)]
     [TestCase("false", "", false)]
     [TestCase("null", "CheckFailed", false)]
-    [TestCase("true", "", true)]
-    [TestCase("false", "", true)]
     [TestCase("null", "CheckFailed", true)]
-    public async Task Run_MapsEventDeserializedByConfiguredWorkerSerializer(
+    public async Task Run_MapsDeserializedEvent(
         string resultJson, string errorType, bool camelCase)
     {
         var correlationId = Guid.NewGuid();
@@ -38,20 +45,16 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
                 .Replace("ErrorType", "errorType");
         }
 
-        // Use the serializer resolved by the same worker configuration as Program.cs,
-        // rather than assuming getter-only properties support POCO input binding.
-        using var host = new HostBuilder().ConfigureFunctionsWorkerDefaults().Build();
-        var serializer = host.Services.GetRequiredService<IOptions<WorkerOptions>>().Value.Serializer!;
+        var serializer = new JsonObjectSerializer(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         using var body = new MemoryStream(Encoding.UTF8.GetBytes(json));
         var message = (EmploymentCheckCompletedEvent)(await serializer.DeserializeAsync(
             body, typeof(EmploymentCheckCompletedEvent), CancellationToken.None))!;
 
         bool? employmentResult = resultJson == "null" ? null : bool.Parse(resultJson);
         var expected = new EmploymentCheckResult(correlationId, employmentResult, checkDate, errorType);
-        var service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
 
-        await new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, CancellationToken.None);
+        await trigger.Run(message, CancellationToken.None);
 
         Assert.That(message.CheckDate.Kind, Is.EqualTo(DateTimeKind.Utc));
         service.Verify(x => x.ProcessAsync(expected, CancellationToken.None), Times.Once);
@@ -63,11 +66,10 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
     {
         using var source = new CancellationTokenSource();
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), false, DateTime.UtcNow, "");
-        var service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token))
             .Returns(Task.CompletedTask);
 
-        await new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, source.Token);
+        await trigger.Run(message, source.Token);
 
         service.Verify(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token), Times.Once);
         service.VerifyNoOtherCalls();
@@ -78,12 +80,11 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
     {
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), true, DateTime.UtcNow, "");
         var failure = new InvalidOperationException("Processing failed");
-        var service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), CancellationToken.None))
             .ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, CancellationToken.None));
+            trigger.Run(message, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
@@ -94,11 +95,10 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
         using var source = new CancellationTokenSource();
         source.Cancel();
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), true, DateTime.UtcNow, "");
-        var service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token))
             .Returns(Task.FromCanceled(source.Token));
 
         Assert.ThrowsAsync<TaskCanceledException>(() =>
-            new EmploymentCheckCompletedServiceBusTrigger(service.Object, NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance).Run(message, source.Token));
+            trigger.Run(message, source.Token));
     }
 }

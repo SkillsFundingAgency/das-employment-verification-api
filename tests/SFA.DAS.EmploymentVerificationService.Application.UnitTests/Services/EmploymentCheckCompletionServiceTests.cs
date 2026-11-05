@@ -23,7 +23,9 @@ public class EmploymentCheckCompletionServiceTests
     {
         repository = new Mock<IEmploymentCheckRepository>(MockBehavior.Strict);
         publisher = new Mock<IEmploymentVerificationPublisher>(MockBehavior.Strict);
-        service = new EmploymentCheckCompletionService(repository.Object, publisher.Object, new FixedTimeProvider(), NullLogger<EmploymentCheckCompletionService>.Instance);
+        var clock = new Mock<TimeProvider>();
+        clock.Setup(x => x.GetUtcNow()).Returns(Now);
+        service = new EmploymentCheckCompletionService(repository.Object, publisher.Object, clock.Object, NullLogger<EmploymentCheckCompletionService>.Instance);
         request = new EmploymentCheckRequest(Guid.NewGuid(), 1234567890, 456, 789, "reference",
             new DateTime(2026, 1, 1), new DateTime(2026, 3, 2), 1,
             (byte)EmploymentCheckStatus.InProgress, new DateTime(2026, 1, 1));
@@ -37,7 +39,7 @@ public class EmploymentCheckCompletionServiceTests
     {
         request = request with { ApprenticeshipId = apprenticeshipId };
         result = result with { EmploymentResult = employed };
-        var expected = new EmploymentCheckCompletion(request.CorrelationId, employed, 2, Now.UtcDateTime);
+        var expected = new EmploymentCheckCompletion(request.CorrelationId, employed, (byte)EmploymentCheckStatus.Completed, Now.UtcDateTime);
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
         repository.Setup(x => x.RecordCompletionAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.Is<VerifyNotEmployedCompleted>(message =>
@@ -71,7 +73,6 @@ public class EmploymentCheckCompletionServiceTests
             Assert.That(recorded!.CreatedOn, Is.EqualTo(Now.UtcDateTime));
             Assert.That(recorded.CreatedOn.Kind, Is.EqualTo(DateTimeKind.Utc));
             Assert.That(recorded.CreatedOn, Is.Not.EqualTo(result.CheckDate));
-            Assert.That(result.CheckDate, Is.EqualTo(new DateTime(2026, 3, 3, 12, 0, 0, DateTimeKind.Utc)));
         });
     }
 
@@ -159,9 +160,5 @@ public class EmploymentCheckCompletionServiceTests
         repository.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);
         repository.VerifyNoOtherCalls();
         publisher.VerifyNoOtherCalls();
-    }
-    private sealed class FixedTimeProvider : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => Now;
     }
 }

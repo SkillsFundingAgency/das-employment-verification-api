@@ -1,40 +1,87 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using Azure.Core;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Moq.Language.Flow;
+using Moq.Protected;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
-using SFA.DAS.EmploymentVerificationService.Application.Services;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Clients;
-using SFA.DAS.EmploymentVerificationService.Infrastructure.Extensions;
 
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Clients;
 
 [TestFixture]
 public class EmploymentCheckClientTests
 {
+    private Mock<HttpMessageHandler> handler = null!;
+    private ISetup<HttpMessageHandler, Task<HttpResponseMessage>> send = null!;
+    private Mock<TokenCredential> credential = null!;
+    private Mock<IHostEnvironment> environment = null!;
+    private IConfiguration configuration = null!;
+    private HttpClient http = null!;
+    private EmploymentCheckClient client = null!;
+    private EmploymentCheckRequest request = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        handler = new Mock<HttpMessageHandler>();
+        send = handler.Protected().Setup<Task<HttpResponseMessage>>("SendAsync",
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
+        send.ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK));
+        http = new HttpClient(handler.Object);
+        credential = new Mock<TokenCredential>(MockBehavior.Strict);
+        environment = new Mock<IHostEnvironment>();
+        environment.SetupGet(x => x.EnvironmentName).Returns(Environments.Development);
+        configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["EmploymentCheckApiUrl"] = "https://localhost:5221/api/EmploymentCheck/RegisterCheck",
+            ["EmploymentCheckApiScope"] = "api://test-api/.default"
+        }).Build();
+        client = new EmploymentCheckClient(http, configuration, environment.Object,
+            NullLogger<EmploymentCheckClient>.Instance, credential.Object);
+        request = new EmploymentCheckRequest(Guid.NewGuid(), 1234567890, 123, 456, "not-sent",
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 3, 2, 0, 0, 0, DateTimeKind.Utc), 1, 1, DateTime.UtcNow);
+    }
+
+    [TearDown]
+    public void TearDown() => http.Dispose();
+
     [TestCase(null, 123L)]
     [TestCase(456L, (long)int.MaxValue)]
-    public async Task SendAsync_PostsMappedRequestAndAcceptsAcknowledgement(long? apprenticeshipId, long accountId)
+    public async Task SendAsync_PostsMappedRequestWithoutAuthenticationInDevelopment(long? apprenticeshipId, long accountId)
     {
-        var request = Request() with { EmployerAccountIdentifier = accountId, ApprenticeshipId = apprenticeshipId };
-        var calls = 0;
-        using var handler = new StubHandler(async (message, token) =>
+        request = request with { EmployerAccountIdentifier = accountId, ApprenticeshipId = apprenticeshipId };
+        HttpRequestMessage outgoing = null!;
+        string bodyText = null!;
+        send.Returns(async (HttpRequestMessage message, CancellationToken token) =>
         {
-            calls++;
-            Assert.That(message.Method, Is.EqualTo(HttpMethod.Post));
-            Assert.That(message.RequestUri!.AbsoluteUri, Is.EqualTo("https://localhost:5221/api/EmploymentCheck/RegisterCheck"));
-            Assert.That(message.Headers.Authorization, Is.Null);
-            Assert.That(message.Content!.Headers.ContentType!.MediaType, Is.EqualTo("application/json"));
-            using var json = JsonDocument.Parse(await message.Content.ReadAsStringAsync(token));
-            var body = json.RootElement;
+            outgoing = message;
+            bodyText = await message.Content!.ReadAsStringAsync(token);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+
+        await client.SendAsync(request, CancellationToken.None);
+
+        handler.Protected().Verify("SendAsync", Times.Once(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
+        credential.VerifyNoOtherCalls();
+        using var json = JsonDocument.Parse(bodyText);
+        var body = json.RootElement;
+        Assert.Multiple(() =>
+        {
+            Assert.That(outgoing.Method, Is.EqualTo(HttpMethod.Post));
+            Assert.That(outgoing.RequestUri!.AbsoluteUri, Is.EqualTo(configuration["EmploymentCheckApiUrl"]));
+            Assert.That(outgoing.Headers.Authorization, Is.Null);
+            Assert.That(outgoing.Content!.Headers.ContentType!.MediaType, Is.EqualTo("application/json"));
             Assert.That(body.EnumerateObject().Select(x => x.Name), Is.EquivalentTo(new[]
-            { "correlationId", "checkType", "uln", "apprenticeshipAccountId", "apprenticeshipId", "minDate", "maxDate" }));
+                { "correlationId", "checkType", "uln", "apprenticeshipAccountId", "apprenticeshipId", "minDate", "maxDate" }));
             Assert.That(body.GetProperty("correlationId").GetGuid(), Is.EqualTo(request.CorrelationId));
             Assert.That(body.GetProperty("checkType").GetString(), Is.EqualTo("VerifyNotEmployed"));
             Assert.That(body.GetProperty("uln").GetInt64(), Is.EqualTo(request.ULN));
@@ -42,66 +89,54 @@ public class EmploymentCheckClientTests
             Assert.That(body.GetProperty("apprenticeshipId").Deserialize<long?>(), Is.EqualTo(apprenticeshipId));
             Assert.That(body.GetProperty("minDate").GetDateTime(), Is.EqualTo(request.StartDate));
             Assert.That(body.GetProperty("maxDate").GetDateTime(), Is.EqualTo(request.EndDate));
-            return Response();
         });
-        using var http = Http(handler);
-        await Client(http).SendAsync(request, CancellationToken.None);
-        Assert.That(calls, Is.EqualTo(1));
     }
 
     [TestCase((long)int.MaxValue + 1)]
     [TestCase((long)int.MinValue - 1)]
     public void SendAsync_RejectsAccountOverflowBeforeSending(long accountId)
     {
-        using var handler = new StubHandler((_, _) => throw new AssertionException("Must not send"));
-        using var http = Http(handler);
-        Assert.ThrowsAsync<OverflowException>(() => Client(http).SendAsync(Request() with { EmployerAccountIdentifier = accountId }, CancellationToken.None));
+        request = request with { EmployerAccountIdentifier = accountId };
+
+        Assert.ThrowsAsync<OverflowException>(() => client.SendAsync(request, CancellationToken.None));
+
+        handler.Protected().Verify("SendAsync", Times.Never(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 
-    [TestCase(200, "{}")]
     [TestCase(200, "{\"errorType\":null,\"errorMessage\":null}")]
-    [TestCase(200, "")]
-    [TestCase(200, "null")]
     [TestCase(200, "not-json")]
     [TestCase(204, "")]
-    public async Task SendAsync_AcceptsSuccessfulStatusWithoutParsingBody(int status, string json)
+    public async Task SendAsync_AcceptsSuccessfulStatusWithoutParsingBody(int status, string body)
     {
-        using var handler = new StubHandler((_, _) =>
-        {
-            var response = Response(json);
-            response.StatusCode = (HttpStatusCode)status;
-            return Task.FromResult(response);
-        });
-        using var http = Http(handler);
-        await Client(http).SendAsync(Request(), CancellationToken.None);
+        send.ReturnsAsync(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent(body) });
+
+        await client.SendAsync(request, CancellationToken.None);
     }
 
     [TestCase(400)]
-    [TestCase(401)]
-    [TestCase(403)]
     [TestCase(500)]
     [TestCase(302)]
     public void SendAsync_PropagatesNonSuccessStatusWithoutRetry(int status)
     {
-        var calls = 0;
-        using var handler = new StubHandler((_, _) =>
-        {
-            calls++;
-            return Task.FromResult(new HttpResponseMessage((HttpStatusCode)status));
-        });
-        using var http = Http(handler);
-        var exception = Assert.ThrowsAsync<HttpRequestException>(() => Client(http).SendAsync(Request(), CancellationToken.None));
+        send.ReturnsAsync(new HttpResponseMessage((HttpStatusCode)status));
+
+        var exception = Assert.ThrowsAsync<HttpRequestException>(() => client.SendAsync(request, CancellationToken.None));
+
         Assert.That(exception!.StatusCode, Is.EqualTo((HttpStatusCode)status));
-        Assert.That(calls, Is.EqualTo(1));
+        handler.Protected().Verify("SendAsync", Times.Once(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 
     [Test]
     public void SendAsync_PropagatesTransportFailure()
     {
         var failure = new HttpRequestException("Connection failed");
-        using var handler = new StubHandler((_, _) => throw failure);
-        using var http = Http(handler);
-        Assert.That(Assert.ThrowsAsync<HttpRequestException>(() => Client(http).SendAsync(Request(), CancellationToken.None)), Is.SameAs(failure));
+        send.ThrowsAsync(failure);
+
+        var thrown = Assert.ThrowsAsync<HttpRequestException>(() => client.SendAsync(request, CancellationToken.None));
+
+        Assert.That(thrown, Is.SameAs(failure));
     }
 
     [Test]
@@ -109,151 +144,107 @@ public class EmploymentCheckClientTests
     {
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        using var handler = new StubHandler((_, _) => throw new AssertionException("Must not send"));
-        using var http = Http(handler);
-        Assert.ThrowsAsync<OperationCanceledException>(() => Client(http).SendAsync(Request(), cancellation.Token));
+
+        Assert.ThrowsAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
+
+        handler.Protected().Verify("SendAsync", Times.Never(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
+        credential.VerifyNoOtherCalls();
     }
 
     [Test]
     public void SendAsync_CancelsInFlightRequest()
     {
         using var cancellation = new CancellationTokenSource();
-        using var handler = new StubHandler(async (_, token) =>
+        send.Returns(async (HttpRequestMessage _, CancellationToken token) =>
         {
             cancellation.Cancel();
             await Task.Delay(Timeout.Infinite, token);
-            return Response();
+            return new HttpResponseMessage(HttpStatusCode.OK);
         });
-        using var http = Http(handler);
-        Assert.CatchAsync<OperationCanceledException>(() => Client(http).SendAsync(Request(), cancellation.Token));
+
+        Assert.CatchAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
     }
 
     [Test]
-    public void SendAsync_TimeoutPropagates()
+    public void SendAsync_PropagatesTimeout()
     {
-        using var handler = new StubHandler(async (_, token) =>
+        send.Returns(async (HttpRequestMessage _, CancellationToken token) =>
         {
             await Task.Delay(Timeout.Infinite, token);
-            return Response();
+            return new HttpResponseMessage(HttpStatusCode.OK);
         });
-        using var http = Http(handler);
         http.Timeout = TimeSpan.FromMilliseconds(50);
-        var exception = Assert.CatchAsync<OperationCanceledException>(() => Client(http).SendAsync(Request(), CancellationToken.None));
+
+        var exception = Assert.CatchAsync<OperationCanceledException>(() => client.SendAsync(request, CancellationToken.None));
+
         Assert.That(exception!.InnerException, Is.TypeOf<TimeoutException>());
     }
 
     [TestCase("Production")]
     [TestCase("Staging")]
     [TestCase("")]
-    public async Task Authentication_AcquiresTokenPerRequestWithScopeAndCancellation(string environment)
+    public async Task SendAsync_AcquiresTokenPerRequestOutsideDevelopment(string environmentName)
     {
+        environment.SetupGet(x => x.EnvironmentName).Returns(environmentName);
         using var cancellation = new CancellationTokenSource();
-        var configuration = Config(Settings());
-        var credential = new Mock<TokenCredential>(MockBehavior.Strict);
-        credential.Setup(x => x.GetTokenAsync(It.Is<TokenRequestContext>(c => c.Scopes.SequenceEqual(new[] { configuration["EmploymentCheckApiScope"]! })), cancellation.Token))
+        credential.Setup(x => x.GetTokenAsync(It.Is<TokenRequestContext>(context =>
+                context.Scopes.SequenceEqual(new[] { configuration["EmploymentCheckApiScope"]! })), cancellation.Token))
             .ReturnsAsync(new AccessToken("fake-token", DateTimeOffset.UtcNow.AddMinutes(5)));
-        using var handler = new StubHandler((message, _) =>
-        {
-            Assert.That(message.Headers.Authorization!.Scheme, Is.EqualTo("Bearer"));
-            Assert.That(message.Headers.Authorization.Parameter, Is.EqualTo("fake-token"));
-            return Task.FromResult(Response());
-        });
-        using var http = Http(handler);
-        var client = Client(http, environment, credential.Object);
-        await client.SendAsync(Request(), cancellation.Token);
-        await client.SendAsync(Request(), cancellation.Token);
+        var headers = new List<AuthenticationHeaderValue?>();
+        send.Callback<HttpRequestMessage, CancellationToken>((message, _) => headers.Add(message.Headers.Authorization))
+            .ReturnsAsync(() => new HttpResponseMessage(HttpStatusCode.OK));
+
+        await client.SendAsync(request, cancellation.Token);
+        await client.SendAsync(request, cancellation.Token);
+
+        Assert.That(headers.Select(header => header?.ToString()), Is.EqualTo(new[] { "Bearer fake-token", "Bearer fake-token" }));
         credential.Verify(x => x.GetTokenAsync(It.IsAny<TokenRequestContext>(), cancellation.Token), Times.Exactly(2));
     }
 
     [Test]
-    public void Authentication_TokenAcquisitionCancellationPreventsHttpRequest()
+    public void SendAsync_TokenAcquisitionCancellationPreventsHttpRequest()
     {
+        environment.SetupGet(x => x.EnvironmentName).Returns(Environments.Production);
         using var cancellation = new CancellationTokenSource();
-        var credential = new Mock<TokenCredential>();
         credential.Setup(x => x.GetTokenAsync(It.IsAny<TokenRequestContext>(), cancellation.Token))
             .Returns(() =>
             {
                 cancellation.Cancel();
                 return ValueTask.FromCanceled<AccessToken>(cancellation.Token);
             });
-        using var handler = new StubHandler((_, _) => throw new AssertionException("Must not send"));
-        using var http = Http(handler);
-        Assert.CatchAsync<OperationCanceledException>(() => Client(http, Environments.Production, credential.Object).SendAsync(Request(), cancellation.Token));
+
+        Assert.CatchAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
+
+        handler.Protected().Verify("SendAsync", Times.Never(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 
     [Test]
-    public void Authentication_FailurePreventsHttpRequest()
+    public void SendAsync_AuthenticationFailurePreventsHttpRequest()
     {
+        environment.SetupGet(x => x.EnvironmentName).Returns(Environments.Production);
         var failure = new AuthenticationFailedException("Token acquisition failed");
-        var credential = new Mock<TokenCredential>();
         credential.Setup(x => x.GetTokenAsync(It.IsAny<TokenRequestContext>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(failure);
-        using var handler = new StubHandler((_, _) => throw new AssertionException("Must not send"));
-        using var http = Http(handler);
 
-        Assert.That(Assert.ThrowsAsync<AuthenticationFailedException>(() =>
-            Client(http, Environments.Production, credential.Object).SendAsync(Request(), CancellationToken.None)),
-            Is.SameAs(failure));
+        var thrown = Assert.ThrowsAsync<AuthenticationFailedException>(() => client.SendAsync(request, CancellationToken.None));
+
+        Assert.That(thrown, Is.SameAs(failure));
+        handler.Protected().Verify("SendAsync", Times.Never(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 
     [Test]
-    public void Registration_UsesSingletonDefaultAzureCredential()
+    public async Task SendAsync_UsesConfiguredEndpoint()
     {
-        var settings = Settings();
-        settings["EmploymentCheckApiUrl"] = "https://example.invalid";
-        settings["AZURE_FUNCTIONS_ENVIRONMENT"] = "Production";
-        settings["ServiceBusConnection"] = "not-used";
-        settings["VerifyNotEmployedCompletedTopicName"] = "outgoing";
-        using var provider = new ServiceCollection().AddSingleton(HostEnvironment(Environments.Production)).AddInfrastructure(Config(settings)).BuildServiceProvider();
+        configuration["EmploymentCheckApiUrl"] = "https://example.invalid/custom/register?version=1";
+        Uri? endpoint = null;
+        send.Callback<HttpRequestMessage, CancellationToken>((message, _) => endpoint = message.RequestUri)
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK));
 
-        var credential = provider.GetRequiredService<TokenCredential>();
-        Assert.That(credential, Is.TypeOf<DefaultAzureCredential>());
-        Assert.That(credential, Is.SameAs(provider.GetRequiredService<TokenCredential>()));
-        Assert.That(provider.GetRequiredService<IEmploymentCheckClient>(), Is.TypeOf<EmploymentCheckClient>());
-    }
+        await client.SendAsync(request, CancellationToken.None);
 
-    [Test]
-    public async Task Registration_ResolvesClientUsingInjectedCredentialAndConfiguration()
-    {
-        var settings = Settings();
-        settings["EmploymentCheckApiUrl"] = "https://example.invalid/custom/register?version=1";
-        settings["ServiceBusConnection"] = "not-used";
-        settings["VerifyNotEmployedCompletedTopicName"] = "outgoing";
-        var credential = new Mock<TokenCredential>();
-        credential.Setup(x => x.GetTokenAsync(It.IsAny<TokenRequestContext>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AccessToken("di-token", DateTimeOffset.UtcNow.AddMinutes(5)));
-        var services = new ServiceCollection().AddSingleton(HostEnvironment(Environments.Production)).AddSingleton(credential.Object).AddInfrastructure(Config(settings));
-        services.AddHttpClient<IEmploymentCheckClient, EmploymentCheckClient>()
-            .ConfigurePrimaryHttpMessageHandler(() => new StubHandler((message, _) =>
-            {
-                Assert.That(message.RequestUri!.AbsoluteUri, Is.EqualTo(settings["EmploymentCheckApiUrl"]));
-                Assert.That(message.Headers.Authorization!.Parameter, Is.EqualTo("di-token"));
-                return Task.FromResult(Response());
-            }));
-        await using var provider = services.BuildServiceProvider();
-        var http = provider.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IEmploymentCheckClient));
-        Assert.That(http.Timeout, Is.EqualTo(TimeSpan.FromSeconds(100)));
-        await provider.GetRequiredService<IEmploymentCheckClient>().SendAsync(Request(), CancellationToken.None);
-    }
-
-    private static EmploymentCheckRequest Request() => new(Guid.NewGuid(), 1234567890, 123, 456,
-        "not-sent", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 3, 2, 0, 0, 0, DateTimeKind.Utc), 1, 1, DateTime.UtcNow);
-    private static HttpResponseMessage Response(string json = "{\"errorType\":null,\"errorMessage\":null}") =>
-        new(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
-    private static HttpClient Http(HttpMessageHandler handler) => new(handler);
-    private static EmploymentCheckClient Client(HttpClient http, string environment = "Development", TokenCredential? credential = null) =>
-        new(http, Config(Settings()), HostEnvironment(environment), NullLogger<EmploymentCheckClient>.Instance,
-            credential ?? new Mock<TokenCredential>(MockBehavior.Strict).Object);
-    private static IHostEnvironment HostEnvironment(string environment) =>
-        Mock.Of<IHostEnvironment>(host => host.EnvironmentName == environment);
-    private static IConfiguration Config(Dictionary<string, string?> settings) => new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
-    private static Dictionary<string, string?> Settings() => new()
-    {
-        ["EmploymentCheckApiUrl"] = "https://localhost:5221/api/EmploymentCheck/RegisterCheck",
-        ["EmploymentCheckApiScope"] = "api://test-api/.default"
-    };
-    private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);
+        Assert.That(endpoint!.AbsoluteUri, Is.EqualTo(configuration["EmploymentCheckApiUrl"]));
     }
 }

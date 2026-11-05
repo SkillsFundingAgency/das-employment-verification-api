@@ -10,9 +10,20 @@ namespace SFA.DAS.EmploymentVerificationService.UnitTests.Triggers;
 [TestFixture]
 public class VerifyNotEmployedServiceBusTriggerTests
 {
+    private Mock<IVerifyNotEmployedService> service = null!;
+    private VerifyNotEmployedServiceBusTrigger trigger = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
+        trigger = new VerifyNotEmployedServiceBusTrigger(service.Object,
+            NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance);
+    }
+
     [TestCase(30, 789L, "reference")]
     [TestCase(null, null, null)]
-    public async Task Run_PassesOriginalCommandAndValuesToService(int? duration, long? apprenticeshipId, string? reference)
+    public async Task Run_ForwardsOriginalCommandInstance(int? duration, long? apprenticeshipId, string? reference)
     {
         var command = new VerifyNotEmployed
         {
@@ -24,20 +35,14 @@ public class VerifyNotEmployedServiceBusTriggerTests
             DurationInDays = duration,
             Reference = reference
         };
-        var service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(received =>
-            ReferenceEquals(received, command) &&
-            received.CorrelationId == command.CorrelationId &&
-            received.ULN == 1234567890L &&
-            received.EmployerAccountIdentifier == 456 &&
-            received.ApprenticeshipId == apprenticeshipId &&
-            received.StartDate == new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc) &&
-            received.DurationInDays == duration && received.Reference == reference), CancellationToken.None))
+            ReferenceEquals(received, command)), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
-        await new VerifyNotEmployedServiceBusTrigger(service.Object, NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance).Run(command, CancellationToken.None);
+        await trigger.Run(command, CancellationToken.None);
 
-        service.Verify(x => x.ProcessAsync(command, CancellationToken.None), Times.Once);
+        service.Verify(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(received =>
+            ReferenceEquals(received, command)), CancellationToken.None), Times.Once);
         service.VerifyNoOtherCalls();
     }
 
@@ -46,10 +51,9 @@ public class VerifyNotEmployedServiceBusTriggerTests
     {
         using var source = new CancellationTokenSource();
         var command = new VerifyNotEmployed();
-        var service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(command, source.Token)).Returns(Task.CompletedTask);
 
-        await new VerifyNotEmployedServiceBusTrigger(service.Object, NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance).Run(command, source.Token);
+        await trigger.Run(command, source.Token);
 
         service.Verify(x => x.ProcessAsync(command, source.Token), Times.Once);
     }
@@ -59,11 +63,10 @@ public class VerifyNotEmployedServiceBusTriggerTests
     {
         var command = new VerifyNotEmployed();
         var failure = new InvalidOperationException("Processing failed");
-        var service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
         service.Setup(x => x.ProcessAsync(command, CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new VerifyNotEmployedServiceBusTrigger(service.Object, NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance).Run(command, CancellationToken.None));
+            trigger.Run(command, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }

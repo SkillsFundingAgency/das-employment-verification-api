@@ -1,3 +1,4 @@
+using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Mapping;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
@@ -9,15 +10,24 @@ namespace SFA.DAS.EmploymentVerificationService.Application.UnitTests.Mapping;
 public class EmploymentCheckRequestFactoryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 29, 12, 34, 56, TimeSpan.Zero);
-    private readonly EmploymentCheckRequestFactory factory = new(new FixedTimeProvider(Now));
+    private EmploymentCheckRequestFactory factory = null!;
 
-    [Test]
-    public void Create_UsesExplicitDuration()
+    [SetUp]
+    public void SetUp()
+    {
+        var clock = new Mock<TimeProvider>();
+        clock.Setup(x => x.GetUtcNow()).Returns(Now);
+        factory = new EmploymentCheckRequestFactory(clock.Object);
+    }
+
+    [TestCase(15, 15)]
+    [TestCase(null, 60)]
+    public void Create_UsesExplicitDurationOrSixtyDayDefault(int? duration, int expectedDays)
     {
         var command = new VerifyNotEmployed
         {
             StartDate = new DateTime(2026, 1, 20, 9, 30, 0, DateTimeKind.Utc),
-            DurationInDays = 15
+            DurationInDays = duration
         };
 
         var request = factory.Create(command);
@@ -25,18 +35,8 @@ public class EmploymentCheckRequestFactoryTests
         Assert.Multiple(() =>
         {
             Assert.That(request.StartDate, Is.EqualTo(command.StartDate));
-            Assert.That(request.EndDate, Is.EqualTo(new DateTime(2026, 2, 4, 9, 30, 0, DateTimeKind.Utc)));
+            Assert.That(request.EndDate, Is.EqualTo(command.StartDate.AddDays(expectedDays)));
         });
-    }
-
-    [Test]
-    public void Create_DefaultsMissingDurationToSixtyDays()
-    {
-        var command = new VerifyNotEmployed { StartDate = new DateTime(2026, 1, 1) };
-
-        var request = factory.Create(command);
-
-        Assert.That(request.EndDate, Is.EqualTo(new DateTime(2026, 3, 2)));
     }
 
     [Test]
@@ -88,8 +88,4 @@ public class EmploymentCheckRequestFactoryTests
         });
     }
 
-    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => utcNow;
-    }
 }

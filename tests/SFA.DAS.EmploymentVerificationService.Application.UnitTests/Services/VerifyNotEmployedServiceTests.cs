@@ -23,7 +23,9 @@ public class VerifyNotEmployedServiceTests
     {
         repository = new Mock<IEmploymentCheckRepository>(MockBehavior.Strict);
         client = new Mock<IEmploymentCheckClient>(MockBehavior.Strict);
-        factory = new EmploymentCheckRequestFactory(new FixedTimeProvider());
+        var clock = new Mock<TimeProvider>();
+        clock.Setup(x => x.GetUtcNow()).Returns(new DateTimeOffset(2026, 10, 29, 12, 0, 0, TimeSpan.Zero));
+        factory = new EmploymentCheckRequestFactory(clock.Object);
         service = new VerifyNotEmployedService(repository.Object, factory, client.Object, NullLogger<VerifyNotEmployedService>.Instance);
         command = new VerifyNotEmployed
         {
@@ -115,8 +117,4 @@ public class VerifyNotEmployedServiceTests
         client.VerifyNoOtherCalls();
     }
 
-    private sealed class FixedTimeProvider : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => new(2026, 10, 29, 12, 0, 0, TimeSpan.Zero);
-    }
 }
