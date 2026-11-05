@@ -58,24 +58,22 @@ public class EmploymentCheckClientTests
         Assert.ThrowsAsync<OverflowException>(() => Client(http).SendAsync(Request() with { EmployerAccountIdentifier = accountId }, CancellationToken.None));
     }
 
-    [TestCase("{}")]
-    [TestCase("{\"ErrorType\":null,\"ErrorMessage\":null}")]
-    [TestCase("{\"errorType\":\"\",\"errorMessage\":\"\"}")]
-    public async Task SendAsync_AcceptsSuccessfulAcknowledgements(string json)
+    [TestCase(200, "{}")]
+    [TestCase(200, "{\"errorType\":null,\"errorMessage\":null}")]
+    [TestCase(200, "")]
+    [TestCase(200, "null")]
+    [TestCase(200, "not-json")]
+    [TestCase(204, "")]
+    public async Task SendAsync_AcceptsSuccessfulStatusWithoutParsingBody(int status, string json)
     {
-        using var handler = new StubHandler((_, _) => Task.FromResult(Response(json)));
+        using var handler = new StubHandler((_, _) =>
+        {
+            var response = Response(json);
+            response.StatusCode = (HttpStatusCode)status;
+            return Task.FromResult(response);
+        });
         using var http = Http(handler);
         await Client(http).SendAsync(Request(), CancellationToken.None);
-    }
-
-    [TestCase("{\"errorType\":\"Bad_Data\"}")]
-    [TestCase("{\"ErrorMessage\":\"Rejected\"}")]
-    [TestCase("null")]
-    public void SendAsync_RejectsApiLevelErrorsOrNullAcknowledgement(string json)
-    {
-        using var handler = new StubHandler((_, _) => Task.FromResult(Response(json)));
-        using var http = Http(handler);
-        Assert.ThrowsAsync<HttpRequestException>(() => Client(http).SendAsync(Request(), CancellationToken.None));
     }
 
     [TestCase(400)]
@@ -95,15 +93,6 @@ public class EmploymentCheckClientTests
         var exception = Assert.ThrowsAsync<HttpRequestException>(() => Client(http).SendAsync(Request(), CancellationToken.None));
         Assert.That(exception!.StatusCode, Is.EqualTo((HttpStatusCode)status));
         Assert.That(calls, Is.EqualTo(1));
-    }
-
-    [TestCase("")]
-    [TestCase("not-json")]
-    public void SendAsync_RejectsMalformedAcknowledgement(string json)
-    {
-        using var handler = new StubHandler((_, _) => Task.FromResult(Response(json)));
-        using var http = Http(handler);
-        Assert.ThrowsAsync<JsonException>(() => Client(http).SendAsync(Request(), CancellationToken.None));
     }
 
     [Test]

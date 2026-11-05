@@ -23,10 +23,11 @@ The endpoint is `POST /api/EmploymentCheck/RegisterCheck`. The client maps:
 | `MinDate` | `StartDate` |
 | `MaxDate` | `EndDate` |
 
-The response is an acknowledgement with `ErrorType` and `ErrorMessage`, not an
-employment result. A successful status with either nonempty error field fails the
-request. Non-success statuses raise HttpRequestException with the status code.
-Transport errors, malformed/null acknowledgements, timeouts and cancellation
+Registration success is determined by HTTP status. The Internal API returns 400
+when either `ErrorType` or `ErrorMessage` is present and 200 otherwise; the Outer
+API propagates those failures. The client does not deserialize the response body.
+Non-success statuses raise HttpRequestException with the status code.
+Transport errors, timeouts and cancellation
 propagate. No POST retry policy is installed; HttpClient uses its default redirect
 behavior. Error response bodies and error
 field contents are not logged because they may contain learner data. The Function

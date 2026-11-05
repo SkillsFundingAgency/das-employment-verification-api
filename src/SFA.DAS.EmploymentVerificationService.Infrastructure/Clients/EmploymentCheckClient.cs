@@ -42,26 +42,10 @@ public sealed class EmploymentCheckClient(
 
         logger.LogInformation("Registering Employment Check for {CorrelationId}", request.CorrelationId);
         using var response = await httpClient.SendAsync(message, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            // Do not log response content, which could include learner data. The trigger logs the exception.
-            logger.LogWarning("Employment Check registration returned HTTP {StatusCode} for {CorrelationId}",
-                (int)response.StatusCode, request.CorrelationId);
-            response.EnsureSuccessStatusCode();
-        }
-
-        var acknowledgement = await response.Content.ReadFromJsonAsync<RegisterCheckResponse>(cancellationToken);
-        if (acknowledgement is null)
-            throw new HttpRequestException("Employment Check API returned a null registration acknowledgement.");
-
-        if (!string.IsNullOrEmpty(acknowledgement.ErrorType) || !string.IsNullOrEmpty(acknowledgement.ErrorMessage))
-        {
-            logger.LogWarning("Employment Check API rejected registration for {CorrelationId}", request.CorrelationId);
-            throw new HttpRequestException("Employment Check API returned an error in the registration acknowledgement.");
-        }
+        response.EnsureSuccessStatusCode();
 
         logger.LogInformation("Employment Check registration accepted for {CorrelationId}", request.CorrelationId);
-        // Transport failures, timeouts, malformed responses and cancellation propagate to the caller.
+        // Transport failures, timeouts and cancellation propagate to the caller.
     }
 
     private class RegisterCheckRequest
@@ -80,6 +64,4 @@ public sealed class EmploymentCheckClient(
 
         public DateTime MaxDate { get; set; }
     }
-
-    private sealed record RegisterCheckResponse(string? ErrorType, string? ErrorMessage);
 }

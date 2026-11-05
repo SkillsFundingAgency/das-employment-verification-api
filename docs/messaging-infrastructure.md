@@ -58,6 +58,11 @@ application settings; no section prefix or double underscores are needed. The ex
 remain required. The two routes must use distinct queues and distinct subscription
 pairs. Forwarding destinations must be in the topic's namespace.
 
+Each EVS subscription and its forwarding queue must have exactly the same name:
+`sfa-das-evs-verify-not-employed` for commands and
+`sfa-das-evs-employment-check-completed` for completion events. Both incoming
+routes use the existing `bundle-1` topic locally.
+
 All three topic names are environment-specific configuration; none is hardcoded.
 For local development, configure both incoming topics and the outgoing topic as
 `bundle-1`. In deployed environments, supply the appropriate topic names, dedicated
@@ -77,12 +82,12 @@ names; there is no fallback to the former nested keys or former outgoing setting
 | `ServiceBusSetupEnabled` | `false` |
 | `ServiceBusFiltersReviewed` | `false` |
 | `VerifyNotEmployedTopic` | `bundle-1` |
-| `VerifyNotEmployedSubscription` | `sbts-evs-verify-not-employed-dev` |
-| `VerifyNotEmployedQueueName` | `sbq-evs-verify-not-employed-dev` |
+| `VerifyNotEmployedSubscription` | `sfa-das-evs-verify-not-employed` |
+| `VerifyNotEmployedQueueName` | `sfa-das-evs-verify-not-employed` |
 | `VerifyNotEmployedFilter` | Empty string until publisher metadata is confirmed |
 | `EmploymentCheckCompletedTopic` | `bundle-1` |
-| `EmploymentCheckCompletedSubscription` | `sbts-evs-employment-check-completed-dev` |
-| `EmploymentCheckCompletedQueueName` | `sbq-evs-employment-check-completed-dev` |
+| `EmploymentCheckCompletedSubscription` | `sfa-das-evs-employment-check-completed` |
+| `EmploymentCheckCompletedQueueName` | `sfa-das-evs-employment-check-completed` |
 | `EmploymentCheckCompletedFilter` | Verified SQL expression below |
 | `VerifyNotEmployedCompletedTopicName` | `bundle-1` |
 

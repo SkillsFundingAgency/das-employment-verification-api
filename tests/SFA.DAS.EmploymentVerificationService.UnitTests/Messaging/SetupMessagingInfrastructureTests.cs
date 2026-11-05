@@ -85,8 +85,8 @@ public class SetupMessagingInfrastructureTests
         Assert.That(options.Enabled, Is.True);
         Assert.That(options.Routes, Is.EqualTo(new[]
         {
-            new MessagingRoute("VerifyNotEmployed", "command-topic", "command-sub", "commands", "sys.Label = 'test-command'"),
-            new MessagingRoute("EmploymentCheckCompletedEvent", "completion-topic", "completion-sub", "completions", CompletionFilter)
+            new MessagingRoute("VerifyNotEmployed", "command-topic", "sfa-das-evs-verify-not-employed", "sfa-das-evs-verify-not-employed", "sys.Label = 'test-command'"),
+            new MessagingRoute("EmploymentCheckCompletedEvent", "completion-topic", "sfa-das-evs-employment-check-completed", "sfa-das-evs-employment-check-completed", CompletionFilter)
         }));
     }
 
@@ -118,12 +118,13 @@ public class SetupMessagingInfrastructureTests
         await provisioner.StartAsync(CancellationToken.None);
         await provisioner.StartAsync(CancellationToken.None);
 
-        Assert.That(admin.Queues, Is.EquivalentTo(new[] { "commands", "completions" }));
+        Assert.That(admin.Queues, Is.EquivalentTo(new[] { "sfa-das-evs-verify-not-employed", "sfa-das-evs-employment-check-completed" }));
         Assert.That(admin.CreatedSubscriptions, Has.Count.EqualTo(2));
+        Assert.That(admin.CreatedSubscriptions.All(subscription => subscription.SubscriptionName == subscription.ForwardTo), Is.True);
         Assert.That(admin.Rules.Values.All(rules => rules.Count == 1), Is.True);
-        Assert.That(((SqlRuleFilter)admin.Rules["completion-sub"].Single().Filter).SqlExpression, Is.EqualTo(CompletionFilter));
-        Assert.That(admin.Subscriptions["command-sub"].ForwardTo, Is.EqualTo("commands"));
-        Assert.That(admin.Subscriptions["completion-sub"].ForwardTo, Is.EqualTo("completions"));
+        Assert.That(((SqlRuleFilter)admin.Rules["sfa-das-evs-employment-check-completed"].Single().Filter).SqlExpression, Is.EqualTo(CompletionFilter));
+        Assert.That(admin.Subscriptions["sfa-das-evs-verify-not-employed"].ForwardTo, Is.EqualTo("sfa-das-evs-verify-not-employed"));
+        Assert.That(admin.Subscriptions["sfa-das-evs-employment-check-completed"].ForwardTo, Is.EqualTo("sfa-das-evs-employment-check-completed"));
     }
 
     [Test]
@@ -131,11 +132,11 @@ public class SetupMessagingInfrastructureTests
     {
         var admin = new InMemoryAdministrationClient();
         await Create(admin).StartAsync(CancellationToken.None);
-        var rules = admin.Rules["command-sub"];
+        var rules = admin.Rules["sfa-das-evs-verify-not-employed"];
         rules[0].Filter = new TrueRuleFilter();
         rules[0].Action = new SqlRuleAction("SET unwanted = 'value'");
         rules.Add(ServiceBusModelFactory.RuleProperties("$Default", new TrueRuleFilter(), null));
-        admin.Subscriptions["command-sub"].ForwardTo = "wrong-queue";
+        admin.Subscriptions["sfa-das-evs-verify-not-employed"].ForwardTo = "wrong-queue";
         admin.Rules["another-service"] = new() { ServiceBusModelFactory.RuleProperties("$Default", new TrueRuleFilter(), null) };
 
         await Create(admin).StartAsync(CancellationToken.None);
@@ -143,7 +144,7 @@ public class SetupMessagingInfrastructureTests
         Assert.That(rules, Has.Count.EqualTo(1));
         Assert.That(rules[0].Filter, Is.TypeOf<SqlRuleFilter>());
         Assert.That(rules[0].Action, Is.Null);
-        Assert.That(admin.Subscriptions["command-sub"].ForwardTo, Is.EqualTo("commands"));
+        Assert.That(admin.Subscriptions["sfa-das-evs-verify-not-employed"].ForwardTo, Is.EqualTo("sfa-das-evs-verify-not-employed"));
         Assert.That(admin.Rules["another-service"].Single().Name, Is.EqualTo("$Default"));
     }
 
@@ -152,9 +153,9 @@ public class SetupMessagingInfrastructureTests
     {
         var admin = new InMemoryAdministrationClient();
         await Create(admin).StartAsync(CancellationToken.None);
-        admin.Rules["command-sub"].Add(ServiceBusModelFactory.RuleProperties("unowned", new TrueRuleFilter(), null));
+        admin.Rules["sfa-das-evs-verify-not-employed"].Add(ServiceBusModelFactory.RuleProperties("unowned", new TrueRuleFilter(), null));
         Assert.ThrowsAsync<InvalidOperationException>(() => Create(admin).StartAsync(CancellationToken.None));
-        Assert.That(admin.Rules["command-sub"].Any(x => x.Name == "unowned"), Is.True);
+        Assert.That(admin.Rules["sfa-das-evs-verify-not-employed"].Any(x => x.Name == "unowned"), Is.True);
     }
 
     [Test]
@@ -162,9 +163,9 @@ public class SetupMessagingInfrastructureTests
     {
         var admin = new InMemoryAdministrationClient();
         await Create(admin).StartAsync(CancellationToken.None);
-        admin.Rules["command-sub"] = new() { ServiceBusModelFactory.RuleProperties("$Default", new TrueRuleFilter(), null) };
+        admin.Rules["sfa-das-evs-verify-not-employed"] = new() { ServiceBusModelFactory.RuleProperties("$Default", new TrueRuleFilter(), null) };
         await Create(admin).StartAsync(CancellationToken.None);
-        Assert.That(admin.Rules["command-sub"].Single().Name, Is.EqualTo("VerifyNotEmployed"));
+        Assert.That(admin.Rules["sfa-das-evs-verify-not-employed"].Single().Name, Is.EqualTo("VerifyNotEmployed"));
     }
 
     [Test]
@@ -172,9 +173,9 @@ public class SetupMessagingInfrastructureTests
     {
         var admin = new InMemoryAdministrationClient { SimulateCreateRaces = true, SimulateDeleteRace = true };
         await Create(admin).StartAsync(CancellationToken.None);
-        admin.Rules["command-sub"] = new() { ServiceBusModelFactory.RuleProperties("$Default", new TrueRuleFilter(), null) };
+        admin.Rules["sfa-das-evs-verify-not-employed"] = new() { ServiceBusModelFactory.RuleProperties("$Default", new TrueRuleFilter(), null) };
         await Create(admin).StartAsync(CancellationToken.None);
-        Assert.That(admin.Rules["command-sub"].Single().Name, Is.EqualTo("VerifyNotEmployed"));
+        Assert.That(admin.Rules["sfa-das-evs-verify-not-employed"].Single().Name, Is.EqualTo("VerifyNotEmployed"));
     }
 
     [Test]
@@ -208,7 +209,7 @@ public class SetupMessagingInfrastructureTests
         var mock = new Mock<ServiceBusAdministrationClient>(MockBehavior.Strict);
         mock.Setup(x => x.TopicExistsAsync("bundle-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Response.FromValue(true, Mock.Of<Response>()));
-        mock.Setup(x => x.QueueExistsAsync("commands", It.IsAny<CancellationToken>()))
+        mock.Setup(x => x.QueueExistsAsync("sfa-das-evs-verify-not-employed", It.IsAny<CancellationToken>()))
             .ReturnsAsync(Response.FromValue(false, Mock.Of<Response>()));
         mock.Setup(x => x.CreateQueueAsync(It.IsAny<CreateQueueOptions>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new RequestFailedException(409, "Conflict unrelated to a completed create"));
@@ -249,14 +250,14 @@ public class SetupMessagingInfrastructureTests
     {
         ["ServiceBusSetupEnabled"] = "true",
         ["ServiceBusFiltersReviewed"] = "true",
-        ["VerifyNotEmployedQueueName"] = "commands",
-        ["EmploymentCheckCompletedQueueName"] = "completions",
+        ["VerifyNotEmployedQueueName"] = "sfa-das-evs-verify-not-employed",
+        ["EmploymentCheckCompletedQueueName"] = "sfa-das-evs-employment-check-completed",
         ["VerifyNotEmployedTopic"] = "bundle-1",
-        ["VerifyNotEmployedSubscription"] = "command-sub",
+        ["VerifyNotEmployedSubscription"] = "sfa-das-evs-verify-not-employed",
         // Synthetic test metadata only; this is not a claim about the real command publisher.
         ["VerifyNotEmployedFilter"] = "sys.Label = 'test-command'",
         ["EmploymentCheckCompletedTopic"] = "bundle-1",
-        ["EmploymentCheckCompletedSubscription"] = "completion-sub",
+        ["EmploymentCheckCompletedSubscription"] = "sfa-das-evs-employment-check-completed",
         ["EmploymentCheckCompletedFilter"] = CompletionFilter,
         ["EmploymentCheckApiUrl"] = "https://localhost:5221/api/EmploymentCheck/RegisterCheck"
     };
