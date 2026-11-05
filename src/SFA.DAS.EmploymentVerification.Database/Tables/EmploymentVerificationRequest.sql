@@ -1,4 +1,4 @@
-CREATE TABLE [EVS].[EmploymentCheckRequest]
+CREATE TABLE [EVS].[EmploymentVerificationRequest]
 (
   Id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_EmploymentCheckRequest PRIMARY KEY,
   CorrelationId UNIQUEIDENTIFIER NOT NULL,

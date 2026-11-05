@@ -71,8 +71,8 @@
     <Build Include="Tables\ApprovalsStatus.sql" />
     <Build Include="Tables\CheckType.sql" />
     <Build Include="Tables\CommitmentStatus.sql" />
-    <Build Include="Tables\EmploymentCheckRequest.sql" />
-    <Build Include="Tables\EmploymentCheckResponse.sql" />
+    <Build Include="Tables\EmploymentVerificationRequest.sql" />
+    <Build Include="Tables\EmploymentVerificationResponse.sql" />
     <Build Include="Tables\EmploymentVerification.sql" />
     <Build Include="Tables\LogError.sql" />
     <Build Include="Tables\LogETLCounts.sql" />

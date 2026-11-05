@@ -8,8 +8,8 @@ public class EmploymentCheckResponseConfiguration : IEntityTypeConfiguration<Emp
 {
     public void Configure(EntityTypeBuilder<EmploymentCheckResponse> builder)
     {
-        builder.ToTable("EmploymentCheckResponse", "EVS");
-        builder.HasKey(x => x.Id);
+        builder.ToTable("EmploymentVerificationResponse", "EVS");
+        builder.HasKey(x => x.Id).HasName("PK_EmploymentCheckResponse");
 
         builder.Property(x => x.Id).HasColumnType("bigint").UseIdentityColumn().IsRequired();
         builder.Property(x => x.CorrelationId).HasColumnType("uniqueidentifier").IsRequired();

@@ -24,6 +24,23 @@ public class ServiceCollectionExtensionsTests
     private const string BusConnection = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=dGVzdA==;UseDevelopmentEmulator=true;";
     private const string ConnectionString = "Server=localhost;Database=RegistrationTests;Integrated Security=true;TrustServerCertificate=true";
 
+    [TestCase(typeof(SFA.DAS.EmploymentVerificationService.Data.Entities.EmploymentCheckRequest), "EmploymentVerificationRequest", "PK_EmploymentCheckRequest")]
+    [TestCase(typeof(SFA.DAS.EmploymentVerificationService.Data.Entities.EmploymentCheckResponse), "EmploymentVerificationResponse", "PK_EmploymentCheckResponse")]
+    public void DataMappings_UseTicketTableNamesAndPreservePrimaryKeyNames(Type entityType, string tableName, string primaryKeyName)
+    {
+        using var provider = CreateServices(ConnectionString).BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<EmploymentVerificationDbContext>();
+        var entity = context.Model.FindEntityType(entityType)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(entity.GetSchema(), Is.EqualTo("EVS"));
+            Assert.That(entity.GetTableName(), Is.EqualTo(tableName));
+            Assert.That(entity.FindPrimaryKey()!.GetName(), Is.EqualTo(primaryKeyName));
+        });
+    }
+
     [Test]
     public void Registrations_RegistersScopedServicesAndSystemClock()
     {

@@ -3,7 +3,10 @@
 Infrastructure registers `EmploymentCheckClient` as the typed HttpClient for the
 Application `IEmploymentCheckClient` interface. The temporary mock is no longer
 registered. The Application request uses `EmployerAccountIdentifier` (long), mapped
-to the existing database `AccountId` column. Request date calculations, persistence ordering,
+to the `AccountId` column in `[EVS].[EmploymentVerificationRequest]`. Responses are
+stored in `[EVS].[EmploymentVerificationResponse]`. See
+[database rename guidance](database-table-names.md) before deploying to an existing
+database. Request date calculations, persistence ordering,
 Service Bus infrastructure and Function triggers are unchanged.
 
 ## Contract confirmed from the local Outer API source
