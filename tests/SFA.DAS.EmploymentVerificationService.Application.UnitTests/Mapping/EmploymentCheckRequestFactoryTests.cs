@@ -70,7 +70,7 @@ public class EmploymentCheckRequestFactoryTests
         {
             Assert.That(request.CorrelationId, Is.EqualTo(command.CorrelationId));
             Assert.That(request.ULN, Is.EqualTo(command.ULN));
-            Assert.That(request.AccountId, Is.EqualTo(command.EmployerAccountIdentifier));
+            Assert.That(request.EmployerAccountIdentifier, Is.EqualTo(command.EmployerAccountIdentifier));
             Assert.That(request.ApprenticeshipId, Is.EqualTo(apprenticeshipId));
             Assert.That(request.Reference, Is.EqualTo(reference));
         });

@@ -34,7 +34,8 @@ public class ServiceCollectionExtensionsTests
         AssertRegistration<IEmploymentVerificationPublisher, EmploymentVerificationPublisher>(services);
         Assert.That(services.Single(x => x.ServiceType == typeof(ServiceBusClient)).Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
         Assert.That(services.Single(x => x.ServiceType == typeof(ServiceBusSender)).Lifetime, Is.EqualTo(ServiceLifetime.Singleton));
-        AssertRegistration<IEmploymentCheckClient, MockEmploymentCheckClient>(services);
+        Assert.That(services.Single(x => x.ServiceType == typeof(IEmploymentCheckClient)).Lifetime,
+            Is.EqualTo(ServiceLifetime.Transient));
         AssertRegistration<EmploymentCheckRequestFactory, EmploymentCheckRequestFactory>(services);
         Assert.That(services.Single(x => x.ServiceType == typeof(EmploymentVerificationDbContext)).Lifetime,
             Is.EqualTo(ServiceLifetime.Scoped));
@@ -63,8 +64,8 @@ public class ServiceCollectionExtensionsTests
         Assert.That(repository, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<IEmploymentCheckRepository>()));
         Assert.That(first.ServiceProvider.GetRequiredService<EmploymentCheckRequestFactory>(), Is.Not.Null);
         var client = first.ServiceProvider.GetRequiredService<IEmploymentCheckClient>();
-        Assert.That(client, Is.TypeOf<MockEmploymentCheckClient>());
-        Assert.That(client, Is.SameAs(first.ServiceProvider.GetRequiredService<IEmploymentCheckClient>()));
+        Assert.That(client, Is.TypeOf<EmploymentCheckClient>());
+        Assert.That(client, Is.Not.SameAs(first.ServiceProvider.GetRequiredService<IEmploymentCheckClient>()));
         Assert.That(client, Is.Not.SameAs(second.ServiceProvider.GetRequiredService<IEmploymentCheckClient>()));
         Assert.That(first.ServiceProvider.GetRequiredService<IVerifyNotEmployedService>(), Is.TypeOf<VerifyNotEmployedService>());
     }
@@ -184,7 +185,8 @@ public class ServiceCollectionExtensionsTests
     {
         ["SqlConnectionString"] = sqlConnection,
         ["ServiceBusConnection"] = BusConnection,
-        ["VerifyNotEmployedCompletedTopicName"] = "registration-tests"
+        ["VerifyNotEmployedCompletedTopicName"] = "registration-tests",
+        ["EmploymentCheckApiUrl"] = "https://localhost:5221/api/EmploymentCheck/RegisterCheck"
     };
 
     private static void AssertConnectionString(EmploymentVerificationDbContext context)
@@ -202,7 +204,7 @@ public class ServiceCollectionExtensionsTests
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(
             PublisherSettings(connectionString)).Build();
-        return new ServiceCollection().AddLogging().AddApplication().AddData(configuration).AddInfrastructure(configuration);
+        return new ServiceCollection().AddSingleton(Moq.Mock.Of<IHostEnvironment>(host => host.EnvironmentName == Environments.Development)).AddLogging().AddApplication().AddData(configuration).AddInfrastructure(configuration);
     }
 
     private static void AssertRegistration<TService, TImplementation>(IServiceCollection services)

@@ -39,7 +39,7 @@ public sealed class EmploymentCheckCompletionService(
             CorrelationId = request.CorrelationId,
             ULN = request.ULN,
             ApprenticeshipId = request.ApprenticeshipId,
-            EmployerAccountIdentifier = request.AccountId,
+            EmployerAccountIdentifier = request.EmployerAccountIdentifier,
             NotEmployed = !employed
         }, cancellationToken);
         logger.LogInformation("VerifyNotEmployedCompleted event published for {CorrelationId}", result.CorrelationId);

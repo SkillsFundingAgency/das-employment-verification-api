@@ -1,7 +1,10 @@
+using Azure.Core;
+using Azure.Identity;
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Clients;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Services;
@@ -38,8 +41,9 @@ public static class ServiceCollectionExtensions
             services.AddHostedService<SetupMessagingInfrastructure>();
         }
 
-        // TODO: Replace with the real EmploymentCheckClient before deployment.
-        services.AddScoped<IEmploymentCheckClient, MockEmploymentCheckClient>();
+        services.TryAddSingleton(configuration);
+        services.TryAddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
+        services.AddHttpClient<IEmploymentCheckClient, EmploymentCheckClient>();
 
         return services;
     }

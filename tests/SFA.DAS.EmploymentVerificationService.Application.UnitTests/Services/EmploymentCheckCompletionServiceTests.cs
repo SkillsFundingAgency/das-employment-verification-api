@@ -44,7 +44,7 @@ public class EmploymentCheckCompletionServiceTests
             message.CorrelationId == request.CorrelationId &&
             message.ULN == request.ULN &&
             message.ApprenticeshipId == request.ApprenticeshipId &&
-            message.EmployerAccountIdentifier == request.AccountId &&
+            message.EmployerAccountIdentifier == request.EmployerAccountIdentifier &&
             message.NotEmployed == notEmployed), CancellationToken.None)).Returns(Task.CompletedTask);
 
         await service.ProcessAsync(result, CancellationToken.None);

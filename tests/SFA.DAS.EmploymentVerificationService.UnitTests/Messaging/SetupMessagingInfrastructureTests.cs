@@ -23,7 +23,8 @@ public class SetupMessagingInfrastructureTests
         var settings = new Dictionary<string, string?>
         {
             ["ServiceBusConnection"] = "not-used",
-            ["VerifyNotEmployedCompletedTopicName"] = "outgoing"
+            ["VerifyNotEmployedCompletedTopicName"] = "outgoing",
+            ["EmploymentCheckApiUrl"] = "https://localhost:5221/api/EmploymentCheck/RegisterCheck"
         };
         var services = new ServiceCollection().AddInfrastructure(Config(settings));
         Assert.That(services.Any(x => x.ServiceType == typeof(ServiceBusAdministrationClient)), Is.False);
@@ -256,7 +257,8 @@ public class SetupMessagingInfrastructureTests
         ["VerifyNotEmployedFilter"] = "sys.Label = 'test-command'",
         ["EmploymentCheckCompletedTopic"] = "bundle-1",
         ["EmploymentCheckCompletedSubscription"] = "completion-sub",
-        ["EmploymentCheckCompletedFilter"] = CompletionFilter
+        ["EmploymentCheckCompletedFilter"] = CompletionFilter,
+        ["EmploymentCheckApiUrl"] = "https://localhost:5221/api/EmploymentCheck/RegisterCheck"
     };
 
     private sealed class InMemoryAdministrationClient : ServiceBusAdministrationClient

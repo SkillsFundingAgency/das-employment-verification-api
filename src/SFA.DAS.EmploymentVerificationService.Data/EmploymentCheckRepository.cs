@@ -21,7 +21,7 @@ public class EmploymentCheckRepository(EmploymentVerificationDbContext context) 
         {
             CorrelationId = request.CorrelationId,
             ULN = request.ULN,
-            AccountId = request.AccountId,
+            AccountId = request.EmployerAccountIdentifier,
             ApprenticeshipId = request.ApprenticeshipId,
             Reference = request.Reference,
             StartDate = request.StartDate,
