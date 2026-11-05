@@ -21,12 +21,18 @@ Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "SFA.DAS.EmploymentVerificat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.Infrastructure", "src\SFA.DAS.EmploymentVerificationService.Infrastructure\SFA.DAS.EmploymentVerificationService.Infrastructure.csproj", "{2B861C99-72AD-4852-8A8D-25A9A14BCF16}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SFA.DAS.EmploymentVerificationService.Specs", "tests\SFA.DAS.EmploymentVerificationService.Specs\SFA.DAS.EmploymentVerificationService.Specs.csproj", "{36E03F54-AB5F-4C71-A256-D1F4C2161BA7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{36E03F54-AB5F-4C71-A256-D1F4C2161BA7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36E03F54-AB5F-4C71-A256-D1F4C2161BA7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36E03F54-AB5F-4C71-A256-D1F4C2161BA7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36E03F54-AB5F-4C71-A256-D1F4C2161BA7}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2B861C99-72AD-4852-8A8D-25A9A14BCF16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2B861C99-72AD-4852-8A8D-25A9A14BCF16}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2B861C99-72AD-4852-8A8D-25A9A14BCF16}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -64,6 +70,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{36E03F54-AB5F-4C71-A256-D1F4C2161BA7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{EE201A06-581D-4106-966A-0B56A833CC4E} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{70CC5E85-9805-484D-8F85-BB3864772A24} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
