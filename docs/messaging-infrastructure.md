@@ -127,24 +127,22 @@ with a default pass-through filter. New queues use the Collection Period referen
 settings: seven-day TTL, expiry dead-lettering, five-minute locks, delivery count
 50 and 5,120 MB capacity. Existing queue settings are preserved.
 
-On existing EVS subscriptions, it repairs the owned rule's expression/action,
-removes `$Default` only after the required rule exists, and repairs ForwardTo.
-Owned rule names are `VerifyNotEmployed` and `EmploymentCheckCompletedEvent`.
-Unexpected additional rules fail startup without being deleted. Use dedicated
-EVS subscriptions, not subscriptions owned by other applications. Final forwarding
-and rules are read back and verified. Previously misrouted messages are not repaired.
+Existing EVS subscriptions are checked once for the expected ForwardTo destination
+and required SQL filter, with no rule action. Owned rule names are
+`VerifyNotEmployed` and `EmploymentCheckCompletedEvent`. Missing or incorrect rules,
+incorrect forwarding and unexpected additional rules fail startup with a clear
+exception; EVS does not repair them. Correct subscriptions are left unchanged,
+except that `$Default` is removed after forwarding and the required SQL filter
+have both been confirmed. No rules are removed if validation fails. Use dedicated
+EVS subscriptions, not subscriptions owned by other applications.
 
-Concurrent already-exists creates are followed by reconciliation. Concurrent
-default-rule deletion is tolerated. Cancellation flows to every administration
-call; permission errors and unresolved failures propagate and fail startup.
-Startup is not transactional across routes: a failure can leave a route partially
-provisioned; rerunning reconciles it. Conflicting deployments with different desired
-configuration must be resolved operationally.
+Cancellation flows to every administration call. Permission errors, concurrent
+creation/deletion conflicts and other administration failures propagate and fail
+startup. Startup is not transactional across routes: a failure can leave a route
+partially provisioned. Resolve incorrect existing configuration before restarting.
 
 The administration credential needs Service Bus Manage rights covering source
 topics/subscriptions/rules and destination queues, including queue creation. A
 Send/Listen-only credential is insufficient. Runtime still needs Listen on the two
 queues and Send on the configured outgoing topic. No NServiceBus dependency is
 introduced. HTTP Employment Check client implementation is outside this change.
-
-Tests use an in-memory administration client and make no Service Bus connections.

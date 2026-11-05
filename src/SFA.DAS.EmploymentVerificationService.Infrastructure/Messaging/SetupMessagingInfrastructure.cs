@@ -1,5 +1,3 @@
-using Azure;
-using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -39,97 +37,57 @@ public sealed class SetupMessagingInfrastructure(
 
         if (!(await client.QueueExistsAsync(route.QueueName, cancellationToken)).Value)
         {
-            await CreateIfMissingAsync(async () =>
+            await client.CreateQueueAsync(new CreateQueueOptions(route.QueueName)
             {
-                await client.CreateQueueAsync(new CreateQueueOptions(route.QueueName)
-                {
-                    DefaultMessageTimeToLive = TimeSpan.FromDays(7),
-                    DeadLetteringOnMessageExpiration = true,
-                    LockDuration = TimeSpan.FromMinutes(5),
-                    MaxDeliveryCount = 50,
-                    MaxSizeInMegabytes = 5120
-                }, cancellationToken);
-            });
-            if (!(await client.QueueExistsAsync(route.QueueName, cancellationToken)).Value)
-                throw new InvalidOperationException($"Queue '{route.QueueName}' does not exist after provisioning.");
+                DefaultMessageTimeToLive = TimeSpan.FromDays(7),
+                DeadLetteringOnMessageExpiration = true,
+                LockDuration = TimeSpan.FromMinutes(5),
+                MaxDeliveryCount = 50,
+                MaxSizeInMegabytes = 5120
+            }, cancellationToken);
         }
 
         if (!(await client.SubscriptionExistsAsync(route.TopicName, route.SubscriptionName, cancellationToken)).Value)
-            await CreateIfMissingAsync(async () =>
+        {
+            await client.CreateSubscriptionAsync(new CreateSubscriptionOptions(route.TopicName, route.SubscriptionName)
             {
-                await client.CreateSubscriptionAsync(new CreateSubscriptionOptions(route.TopicName, route.SubscriptionName)
-                {
-                    ForwardTo = route.QueueName,
-                    DefaultMessageTimeToLive = TimeSpan.FromDays(7),
-                    DeadLetteringOnMessageExpiration = true,
-                    LockDuration = TimeSpan.FromMinutes(5),
-                    MaxDeliveryCount = 50
-                }, new CreateRuleOptions(route.RuleName, new SqlRuleFilter(route.SqlFilter)), cancellationToken);
-            });
-
-        // Always reconcile, including when another host won a create race.
-        var rules = await ReadRulesAsync(route, cancellationToken);
-        if (rules.Any(rule => rule.Name != route.RuleName && !IsDefault(rule.Name)))
-            throw new InvalidOperationException($"Subscription '{route.SubscriptionName}' contains unexpected rules; review them before provisioning.");
-
-        var requiredRule = rules.SingleOrDefault(rule => rule.Name == route.RuleName);
-        if (requiredRule is null)
-        {
-            await CreateIfMissingAsync(async () =>
-            {
-                await client.CreateRuleAsync(route.TopicName, route.SubscriptionName,
-                    new CreateRuleOptions(route.RuleName, new SqlRuleFilter(route.SqlFilter)), cancellationToken);
-            });
-            requiredRule = (await client.GetRuleAsync(route.TopicName, route.SubscriptionName, route.RuleName, cancellationToken)).Value;
-        }
-        if (!IsRequiredRule(requiredRule, route))
-        {
-            requiredRule.Filter = new SqlRuleFilter(route.SqlFilter);
-            requiredRule.Action = null;
-            await client.UpdateRuleAsync(route.TopicName, route.SubscriptionName, requiredRule, cancellationToken);
-        }
-
-        foreach (var rule in rules.Where(rule => IsDefault(rule.Name)))
-        {
-            try { await client.DeleteRuleAsync(route.TopicName, route.SubscriptionName, rule.Name, cancellationToken); }
-            catch (ServiceBusException exception) when (exception.Reason == ServiceBusFailureReason.MessagingEntityNotFound) { }
-            catch (RequestFailedException exception) when (exception.Status == 404) { }
+                ForwardTo = route.QueueName,
+                DefaultMessageTimeToLive = TimeSpan.FromDays(7),
+                DeadLetteringOnMessageExpiration = true,
+                LockDuration = TimeSpan.FromMinutes(5),
+                MaxDeliveryCount = 50
+            }, new CreateRuleOptions(route.RuleName, new SqlRuleFilter(route.SqlFilter)), cancellationToken);
+            return;
         }
 
         var subscription = (await client.GetSubscriptionAsync(route.TopicName, route.SubscriptionName, cancellationToken)).Value;
         if (!string.Equals(subscription.ForwardTo, route.QueueName, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                $"Subscription '{route.TopicName}/{route.SubscriptionName}' forwards to '{subscription.ForwardTo}' instead of '{route.QueueName}'. Correct the forwarding destination before starting EVS.");
+
+        RuleProperties? requiredRule = null;
+        RuleProperties? defaultRule = null;
+        await foreach (var rule in client.GetRulesAsync(route.TopicName, route.SubscriptionName, cancellationToken))
         {
-            subscription.ForwardTo = route.QueueName;
-            await client.UpdateSubscriptionAsync(subscription, cancellationToken);
+            if (rule.Name == route.RuleName)
+                requiredRule = rule;
+            else if (rule.Name.Equals(RuleProperties.DefaultRuleName, StringComparison.OrdinalIgnoreCase))
+                defaultRule = rule;
+            else
+                throw new InvalidOperationException(
+                    $"Subscription '{route.TopicName}/{route.SubscriptionName}' contains unexpected rule '{rule.Name}'. Review its rules before starting EVS.");
         }
 
-        var finalRules = await ReadRulesAsync(route, cancellationToken);
-        subscription = (await client.GetSubscriptionAsync(route.TopicName, route.SubscriptionName, cancellationToken)).Value;
-        if (finalRules.Count != 1 || !IsRequiredRule(finalRules[0], route)
-            || !string.Equals(subscription.ForwardTo, route.QueueName, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Subscription '{route.SubscriptionName}' did not retain the required forwarding and exclusive filter configuration.");
-    }
+        if (requiredRule is null)
+            throw new InvalidOperationException(
+                $"Subscription '{route.TopicName}/{route.SubscriptionName}' is missing required SQL filter rule '{route.RuleName}'. Configure it before starting EVS.");
+        if (requiredRule.Filter is not SqlRuleFilter filter || filter.SqlExpression != route.SqlFilter || requiredRule.Action is not null)
+            throw new InvalidOperationException(
+                $"Subscription '{route.TopicName}/{route.SubscriptionName}' rule '{route.RuleName}' must use SQL filter '{route.SqlFilter}' with no rule action. Correct the rule before starting EVS.");
 
-    private async Task<List<RuleProperties>> ReadRulesAsync(MessagingRoute route, CancellationToken cancellationToken)
-    {
-        var rules = new List<RuleProperties>();
-        await foreach (var rule in client.GetRulesAsync(route.TopicName, route.SubscriptionName, cancellationToken))
-            rules.Add(rule);
-        return rules;
-    }
-
-    private static bool IsDefault(string name) => name.Equals(RuleProperties.DefaultRuleName, StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsRequiredRule(RuleProperties rule, MessagingRoute route) =>
-        rule.Name == route.RuleName && rule.Filter is SqlRuleFilter filter && filter.SqlExpression == route.SqlFilter
-        && rule.Action is null;
-
-    private static async Task CreateIfMissingAsync(Func<Task> create)
-    {
-        try { await create(); }
-        catch (ServiceBusException exception) when (exception.Reason == ServiceBusFailureReason.MessagingEntityAlreadyExists) { }
-        catch (RequestFailedException exception) when (exception.Status == 409) { }
-        // The caller reads the entity back; a conflict alone never establishes correctness.
+        // Remove the catch-all only after forwarding and the required SQL filter are confirmed.
+        if (defaultRule is not null)
+            await client.DeleteRuleAsync(route.TopicName, route.SubscriptionName, defaultRule.Name, cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
