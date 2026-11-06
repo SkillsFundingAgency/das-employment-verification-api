@@ -3,10 +3,35 @@ using Microsoft.Extensions.Configuration;
 
 namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
-public sealed record MessagingRoute(string RuleName, string TopicName, string SubscriptionName, string QueueName, string SqlFilter);
-
-public sealed record MessagingInfrastructureOptions(bool Enabled, IReadOnlyList<MessagingRoute> Routes)
+public sealed class MessagingRoute
 {
+    public MessagingRoute(string ruleName, string topicName, string subscriptionName, string queueName, string sqlFilter)
+    {
+        RuleName = ruleName;
+        TopicName = topicName;
+        SubscriptionName = subscriptionName;
+        QueueName = queueName;
+        SqlFilter = sqlFilter;
+    }
+
+    public string RuleName { get; }
+    public string TopicName { get; }
+    public string SubscriptionName { get; }
+    public string QueueName { get; }
+    public string SqlFilter { get; }
+}
+
+public sealed class MessagingInfrastructureOptions
+{
+    public MessagingInfrastructureOptions(bool enabled, IReadOnlyList<MessagingRoute> routes)
+    {
+        Enabled = enabled;
+        Routes = routes;
+    }
+
+    public bool Enabled { get; }
+    public IReadOnlyList<MessagingRoute> Routes { get; }
+
     // Deliberately accept only a single property comparison. Arbitrary SQL can contain
     // tautologies (including OR 1=1), which must never create a catch-all subscription.
     private static readonly Regex PropertyComparison = new(
