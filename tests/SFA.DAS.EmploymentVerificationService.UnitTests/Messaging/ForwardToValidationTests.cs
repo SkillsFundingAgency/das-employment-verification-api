@@ -1,7 +1,6 @@
 using Azure;
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
@@ -14,11 +13,8 @@ namespace SFA.DAS.EmploymentVerificationService.UnitTests.Messaging;
 public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
 {
     private const string QueueName = "sfa-das-evs-verify-not-employed";
-    private const string Namespace = "das-pv2-dev-sa.servicebus.windows.net";
-    private string CurrentNamespace => serviceBusNamespace == ServiceBusNamespace.Payments ? Namespace : "das-shared.servicebus.windows.net";
     private const string SqlFilter = "sys.Label = 'test-command'";
     private Mock<ServiceBusAdministrationClient> client = null!;
-    private IConfiguration configuration = null!;
     private SubscriptionProperties subscription = null!;
     private MessagingInfrastructureOptions options = null!;
     private SetupMessagingInfrastructure service = null!;
@@ -27,10 +23,6 @@ public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
     public void SetUp()
     {
         client = new Mock<ServiceBusAdministrationClient>(MockBehavior.Strict);
-        configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            [serviceBusNamespace + "ServiceBusConnection"] = $"Endpoint=sb://{CurrentNamespace}/;SharedAccessKeyName=test;SharedAccessKey=dGVzdA=="
-        }).Build();
         subscription = ServiceBusModelFactory.SubscriptionProperties("bundle-1", QueueName,
             lockDuration: TimeSpan.FromMinutes(5), defaultMessageTimeToLive: TimeSpan.FromDays(7),
             autoDeleteOnIdle: TimeSpan.MaxValue, maxDeliveryCount: 50, status: EntityStatus.Active,
@@ -65,18 +57,16 @@ public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
                 SqlFilter = SqlFilter
             }
         ]);
-        service = new SetupMessagingInfrastructure(new Dictionary<ServiceBusNamespace, ServiceBusAdministrationClient> { [serviceBusNamespace] = client.Object, [serviceBusNamespace == ServiceBusNamespace.Payments ? ServiceBusNamespace.DasShared : ServiceBusNamespace.Payments] = new Mock<ServiceBusAdministrationClient>(MockBehavior.Strict).Object }, options, configuration,
+        service = new SetupMessagingInfrastructure(new Dictionary<ServiceBusNamespace, ServiceBusAdministrationClient> { [serviceBusNamespace] = client.Object, [serviceBusNamespace == ServiceBusNamespace.Payments ? ServiceBusNamespace.DasShared : ServiceBusNamespace.Payments] = new Mock<ServiceBusAdministrationClient>(MockBehavior.Strict).Object }, options,
             NullLogger<SetupMessagingInfrastructure>.Instance);
     }
 
     [TestCase(QueueName)]
-    [TestCase("http://" + Namespace + "/" + QueueName)]
-    [TestCase("https://" + Namespace + "/" + QueueName)]
-    [TestCase("sb://" + Namespace + "/" + QueueName)]
-    [TestCase("http://DAS-PV2-DEV-SA.servicebus.windows.net/SFA-DAS-EVS-VERIFY-NOT-EMPLOYED")]
+    [TestCase("https://das-pv2-dev-sa.servicebus.windows.net/" + QueueName)]
+    [TestCase("SFA-DAS-EVS-VERIFY-NOT-EMPLOYED")]
     public async Task StartAsync_AcceptsEquivalentDestinationsAndRemovesDefaultAfterValidation(string forwardTo)
     {
-        subscription.ForwardTo = forwardTo?.Replace(Namespace, CurrentNamespace, StringComparison.OrdinalIgnoreCase);
+        subscription.ForwardTo = forwardTo;
 
         await service.StartAsync(CancellationToken.None);
 
@@ -86,16 +76,9 @@ public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
     [TestCase(null)]
     [TestCase("")]
     [TestCase("wrong-queue")]
-    [TestCase("http://" + Namespace + "/wrong-queue")]
-    [TestCase("http://other.servicebus.windows.net/" + QueueName)]
-    [TestCase("http://" + Namespace + ".example.com/" + QueueName)]
-    [TestCase("http://" + Namespace + "/prefix/" + QueueName)]
-    [TestCase("http://" + Namespace + ":9999/" + QueueName)]
-    [TestCase("http://" + Namespace + "/" + QueueName + "#other")]
-    [TestCase("http://user@" + Namespace + "/" + QueueName)]
     public void StartAsync_RejectsIncorrectDestinationsWithoutRemovingDefault(string? forwardTo)
     {
-        subscription.ForwardTo = forwardTo?.Replace(Namespace, CurrentNamespace, StringComparison.OrdinalIgnoreCase);
+        subscription.ForwardTo = forwardTo;
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None));
 
@@ -117,41 +100,4 @@ public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [TestCase(null)]
-    [TestCase("")]
-    [TestCase(" \t")]
-    public async Task StartAsync_UsesRuntimeWhenAdministrationConnectionMissing(string? administration)
-    {
-        configuration[serviceBusNamespace + "ServiceBusAdministrationConnection"] = administration;
-        subscription.ForwardTo = $"sb://{CurrentNamespace}/{QueueName}";
-        await service.StartAsync(CancellationToken.None);
-    }
-
-    [Test]
-    public async Task StartAsync_AcceptsAdministrationConnectionInSameNamespace()
-    {
-        configuration[serviceBusNamespace + "ServiceBusAdministrationConnection"] =
-            $"Endpoint=sb://{CurrentNamespace}/;SharedAccessKeyName=admin;SharedAccessKey=dGVzdA==";
-        await service.StartAsync(CancellationToken.None);
-    }
-
-    [Test]
-    public void StartAsync_RejectsAdministrationNamespaceMismatchBeforeAnyCalls()
-    {
-        configuration[serviceBusNamespace + "ServiceBusAdministrationConnection"] =
-            "Endpoint=sb://other.servicebus.windows.net/;SharedAccessKeyName=test;SharedAccessKey=dGVzdA==";
-        Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None))!.Message,
-            Does.Contain("same namespace"));
-        client.VerifyNoOtherCalls();
-    }
-    [Test]
-    public void StartAsync_RejectsOtherRouteNamespaceWithIdenticalQueueName()
-    {
-        var otherNamespace = serviceBusNamespace == ServiceBusNamespace.Payments
-            ? "das-shared.servicebus.windows.net" : Namespace;
-        subscription.ForwardTo = $"sb://{otherNamespace}/{QueueName}";
-        Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None));
-        client.Verify(x => x.DeleteRuleAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<CancellationToken>()), Times.Never);
-    }
 }

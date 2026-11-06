@@ -37,10 +37,15 @@ public static class ServiceCollectionExtensions
         {
             services.AddSingleton(provisioning);
             services.AddSingleton<IReadOnlyDictionary<ServiceBusNamespace, ServiceBusAdministrationClient>>(_ =>
-                provisioning.Routes.Select(route => route.Namespace).Distinct().ToDictionary(
-                    serviceBusNamespace => serviceBusNamespace,
-                    serviceBusNamespace => new ServiceBusAdministrationClient(
-                        ServiceBusNamespaceConnection.AdministrationConnection(configuration, serviceBusNamespace))));
+                new Dictionary<ServiceBusNamespace, ServiceBusAdministrationClient>
+                {
+                    [ServiceBusNamespace.DasShared] = new ServiceBusAdministrationClient(
+                        configuration["DasSharedServiceBusAdministrationConnection"]
+                        ?? configuration["DasSharedServiceBusConnection"]),
+                    [ServiceBusNamespace.Payments] = new ServiceBusAdministrationClient(
+                        configuration["PaymentsServiceBusAdministrationConnection"]
+                        ?? configuration["PaymentsServiceBusConnection"])
+                });
             services.AddHostedService<SetupMessagingInfrastructure>();
         }
 
