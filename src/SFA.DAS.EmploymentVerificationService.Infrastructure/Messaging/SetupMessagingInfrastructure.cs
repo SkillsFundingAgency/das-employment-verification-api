@@ -88,7 +88,7 @@ public sealed class SetupMessagingInfrastructure(
             throw new InvalidOperationException(
                 $"Subscription '{route.TopicName}/{route.SubscriptionName}' rule '{route.RuleName}' must use SQL filter '{route.SqlFilter}' with no rule action. Correct the rule before starting EVS.");
 
-        // Remove the catch-all only after forwarding and the required SQL filter are confirmed.
+        // Remove the catch-all rule
         if (defaultRule is not null)
             await client.DeleteRuleAsync(route.TopicName, route.SubscriptionName, defaultRule.Name, cancellationToken);
     }
