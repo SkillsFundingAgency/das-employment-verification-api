@@ -174,6 +174,6 @@ VerifyNotEmployedCompletedTopicName independently selects the Payments outgoing 
 Optional namespace-specific administration connections are described in
 [EVS messaging infrastructure](docs/messaging-infrastructure.md), including the complete
 local settings example. Supply verified credentials; do not commit secrets.
-Keep ServiceBusSetupEnabled=false and ServiceBusFiltersReviewed=false while the
-local-testing DataLocks filter awaits separate verification. The older template
+Keep ServiceBusSetupEnabled=false and ServiceBusFiltersReviewed=false until the
+environment's messaging configuration has been reviewed. The older template
 examples above describe unrelated starter configuration, not EVS messaging settings.

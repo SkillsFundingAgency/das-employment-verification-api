@@ -45,7 +45,9 @@ public class EmploymentVerificationPublisherTests
         Assert.That(sent!.ContentType, Is.EqualTo("application/json"));
         Assert.That(sent.Subject, Is.EqualTo("VerifyNotEmployedCompleted"));
         Assert.That(sent.CorrelationId, Is.EqualTo(message.CorrelationId.ToString()));
-        Assert.That(sent.ApplicationProperties, Is.Empty);
+        Assert.That(sent.ApplicationProperties, Has.Count.EqualTo(1));
+        Assert.That(sent.ApplicationProperties["NServiceBus.EnclosedMessageTypes"],
+            Is.EqualTo(typeof(VerifyNotEmployedCompleted).AssemblyQualifiedName));
         using var body = JsonDocument.Parse(sent.Body.ToString());
         var root = body.RootElement;
         Assert.That(root.EnumerateObject().Count(), Is.EqualTo(5));

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
+using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Messaging;
@@ -90,21 +91,21 @@ public class MessagingInfrastructureOptionsTests
     }
 
     [Test]
-    public void For_UsesVerifiedEmploymentCheckFilterAndLocalTestingOnlyDataLocksFilter()
+    public void For_UsesConfirmedEnclosedMessageTypesFilters()
     {
         var routes = EvsRoutes.For(configuration);
 
         Assert.Multiple(() =>
         {
-            // LOCAL TESTING ONLY: this does not establish the real DataLocks publisher metadata.
-            Assert.That(routes[0].SqlFilter, Is.EqualTo("sys.Label = 'VerifyNotEmployed'"));
+            Assert.That(routes[0].SqlFilter, Is.EqualTo(
+                $"[NServiceBus.EnclosedMessageTypes] LIKE '%{typeof(VerifyNotEmployed).FullName}%'"));
             Assert.That(routes[1].SqlFilter, Is.EqualTo(
                 "[NServiceBus.EnclosedMessageTypes] LIKE '%SFA.DAS.EmploymentCheck.Types.EmploymentCheckCompletedEvent%'"));
         });
     }
 
     [Test]
-    public void Read_WithLocalTestingOnlyFilterAndReviewedRoutes_ReturnsEnabledOptions()
+    public void Read_WithConfirmedFiltersAndReviewedRoutes_ReturnsEnabledOptions()
     {
         var options = MessagingInfrastructureOptions.Read(configuration);
 

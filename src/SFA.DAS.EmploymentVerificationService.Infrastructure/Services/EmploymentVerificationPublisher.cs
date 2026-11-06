@@ -16,6 +16,9 @@ public sealed class EmploymentVerificationPublisher(ServiceBusSender sender) : I
             CorrelationId = message.CorrelationId.ToString()
         };
 
+        serviceBusMessage.ApplicationProperties["NServiceBus.EnclosedMessageTypes"] =
+            typeof(VerifyNotEmployedCompleted).AssemblyQualifiedName!;
+
         return sender.SendMessageAsync(serviceBusMessage, cancellationToken);
     }
 }

@@ -38,7 +38,7 @@ Retired settings are ServiceBusConnection, ServiceBusAdministrationConnection an
 
 EmploymentCheckCompletedServiceBusTrigger selects DasSharedServiceBusConnection; VerifyNotEmployedServiceBusTrigger selects PaymentsServiceBusConnection. Existing queue-name expressions and processing logic are unchanged.
 
-The outgoing ServiceBusClient uses PaymentsServiceBusConnection and creates its sender from VerifyNotEmployedCompletedTopicName. EmploymentVerificationPublisher only serializes and sends through that sender; its implementation and message metadata are unchanged.
+The outgoing ServiceBusClient uses PaymentsServiceBusConnection and creates its sender from VerifyNotEmployedCompletedTopicName. EmploymentVerificationPublisher serializes and sends through that sender, explicitly setting the NServiceBus.EnclosedMessageTypes application property to typeof(VerifyNotEmployedCompleted).AssemblyQualifiedName. JSON serialization, Subject, ContentType, CorrelationId and cancellation support are preserved.
 
 ## Route definitions and filters
 
@@ -50,13 +50,13 @@ The EmploymentCheckCompletedEvent rule retains:
 [NServiceBus.EnclosedMessageTypes] LIKE '%SFA.DAS.EmploymentCheck.Types.EmploymentCheckCompletedEvent%'
 ```
 
-The VerifyNotEmployed rule retains this TEMPORARY LOCAL-TESTING filter:
+Dave confirmed that DataLocks publishes VerifyNotEmployed with NServiceBus.EnclosedMessageTypes. The incoming SQL filter is derived from typeof(VerifyNotEmployed).FullName, without hardcoding the namespace, and currently resolves to:
 
 ```sql
-sys.Label = 'VerifyNotEmployed'
+[NServiceBus.EnclosedMessageTypes] LIKE '%SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands.VerifyNotEmployed%'
 ```
 
-This is not a production-approved DataLocks filter. Final publisher metadata and filter verification are a separate task. Keep ServiceBusSetupEnabled=false and ServiceBusFiltersReviewed=false. A non-empty filter and review flag do not establish that publisher metadata has been verified. No NServiceBus dependency is introduced; the completion filter only inspects an existing message property.
+Both incoming filters inspect NServiceBus.EnclosedMessageTypes for the full CLR type name, allowing assembly-qualified message type metadata. Outgoing VerifyNotEmployedCompleted messages explicitly carry their assembly-qualified type name in the same application property, even though EVS uses Azure.Messaging.ServiceBus directly. No NServiceBus dependency is introduced. ServiceBusSetupEnabled and ServiceBusFiltersReviewed remain false in local settings; this change does not enable provisioning or alter existing Azure subscription rules. Existing subscriptions using the previous label filter need a separately managed rule update before provisioning is enabled, because EVS validates rather than repairs mismatched rules.
 
 ## Provisioning and validation
 
