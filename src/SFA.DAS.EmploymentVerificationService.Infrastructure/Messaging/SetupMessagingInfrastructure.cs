@@ -1,4 +1,6 @@
+using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -7,6 +9,7 @@ namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 public sealed class SetupMessagingInfrastructure(
     ServiceBusAdministrationClient client,
     MessagingInfrastructureOptions options,
+    IConfiguration configuration,
     ILogger<SetupMessagingInfrastructure> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -61,9 +64,9 @@ public sealed class SetupMessagingInfrastructure(
         }
 
         var subscription = (await client.GetSubscriptionAsync(route.TopicName, route.SubscriptionName, cancellationToken)).Value;
-        if (!string.Equals(subscription.ForwardTo, route.QueueName, StringComparison.OrdinalIgnoreCase))
+        if (!ForwardsToQueue(subscription.ForwardTo, route.QueueName))
             throw new InvalidOperationException(
-                $"Subscription '{route.TopicName}/{route.SubscriptionName}' forwards to '{subscription.ForwardTo}' instead of '{route.QueueName}'. Correct the forwarding destination before starting EVS.");
+                $"Subscription '{route.TopicName}/{route.SubscriptionName}' forwards to '{subscription.ForwardTo}' instead of queue '{route.QueueName}' in the configured Service Bus namespace. Correct the forwarding destination before starting EVS.");
 
         RuleProperties? requiredRule = null;
         RuleProperties? defaultRule = null;
@@ -88,6 +91,26 @@ public sealed class SetupMessagingInfrastructure(
         // Remove the catch-all only after forwarding and the required SQL filter are confirmed.
         if (defaultRule is not null)
             await client.DeleteRuleAsync(route.TopicName, route.SubscriptionName, defaultRule.Name, cancellationToken);
+    }
+
+    private bool ForwardsToQueue(string? forwardTo, string queueName)
+    {
+        if (string.Equals(forwardTo, queueName, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!Uri.TryCreate(forwardTo, UriKind.Absolute, out var destination)
+            || destination.Scheme is not ("http" or "https" or "sb"))
+            return false;
+
+        var connection = ServiceBusConnectionStringProperties.Parse(
+            configuration["ServiceBusAdministrationConnection"] ?? configuration["ServiceBusConnection"]);
+
+        return string.Equals(destination.Host, connection.FullyQualifiedNamespace, StringComparison.OrdinalIgnoreCase)
+            && (destination.IsDefaultPort || destination.Port == connection.Endpoint.Port)
+            && string.Equals(Uri.UnescapeDataString(destination.AbsolutePath), $"/{queueName}", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(destination.UserInfo)
+            && string.IsNullOrEmpty(destination.Query)
+            && string.IsNullOrEmpty(destination.Fragment);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

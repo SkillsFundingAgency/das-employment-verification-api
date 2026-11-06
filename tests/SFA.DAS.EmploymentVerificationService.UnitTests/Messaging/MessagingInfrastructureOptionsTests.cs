@@ -86,27 +86,28 @@ public class MessagingInfrastructureOptionsTests
     }
 
     [Test]
-    public void For_UsesVerifiedEmploymentCheckFilterAndEmptyDataLocksPlaceholder()
+    public void For_UsesVerifiedEmploymentCheckFilterAndLocalTestingOnlyDataLocksFilter()
     {
         var routes = EvsRoutes.For(configuration);
 
         Assert.Multiple(() =>
         {
-            Assert.That(routes[0].SqlFilter, Is.Empty);
+            // LOCAL TESTING ONLY: this does not establish the real DataLocks publisher metadata.
+            Assert.That(routes[0].SqlFilter, Is.EqualTo("sys.Label = 'VerifyNotEmployed'"));
             Assert.That(routes[1].SqlFilter, Is.EqualTo(
                 "[NServiceBus.EnclosedMessageTypes] LIKE '%SFA.DAS.EmploymentCheck.Types.EmploymentCheckCompletedEvent%'"));
         });
     }
 
     [Test]
-    public void Read_WhenDataLocksFilterIsUnresolved_RejectsProvisioningWithClearReason()
+    public void Read_WithLocalTestingOnlyFilterAndReviewedRoutes_ReturnsEnabledOptions()
     {
-        var exception = Assert.Throws<InvalidOperationException>(() => MessagingInfrastructureOptions.Read(configuration));
+        var options = MessagingInfrastructureOptions.Read(configuration);
 
         Assert.Multiple(() =>
         {
-            Assert.That(exception!.Message, Does.Contain("VerifyNotEmployed"));
-            Assert.That(exception.Message, Does.Contain("DataLocks publishing metadata must be confirmed"));
+            Assert.That(options.Enabled, Is.True);
+            Assert.That(options.Routes, Has.Count.EqualTo(2));
         });
     }
 

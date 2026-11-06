@@ -5,9 +5,10 @@ namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
 public static class EvsRoutes
 {
-    // TODO: Confirm DataLocks publishing metadata before defining this filter.
-    // An empty filter deliberately prevents enabled provisioning.
-    private const string VerifyNotEmployedSqlFilter = "";
+    // LOCAL TESTING ONLY: temporary filter for local infrastructure testing.
+    // TODO: Confirm DataLocks publishing metadata before using this filter outside local testing.
+    private const string VerifyNotEmployedSqlFilter =
+        "sys.Label = 'VerifyNotEmployed'";
     private const string EmploymentCheckCompletedSqlFilter =
         "[NServiceBus.EnclosedMessageTypes] LIKE '%SFA.DAS.EmploymentCheck.Types.EmploymentCheckCompletedEvent%'";
 
