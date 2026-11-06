@@ -16,7 +16,8 @@ public class MessagingInfrastructureOptionsTests
         {
             ["ServiceBusSetupEnabled"] = "true",
             ["ServiceBusFiltersReviewed"] = "true",
-            ["ServiceBusTopicName"] = "test-topic",
+            ["PaymentsServiceBusTopicName"] = "payments-topic",
+            ["DasSharedServiceBusTopicName"] = "das-topic",
             ["VerifyNotEmployedQueueName"] = "command-queue",
             ["VerifyNotEmployedSubscriptionName"] = "command-subscription",
             ["EmploymentCheckCompletedQueueName"] = "completion-queue",
@@ -53,7 +54,8 @@ public class MessagingInfrastructureOptionsTests
         Assert.That(exception!.Message, Does.Contain("ServiceBusFiltersReviewed"));
     }
 
-    [TestCase("ServiceBusTopicName")]
+    [TestCase("PaymentsServiceBusTopicName")]
+    [TestCase("DasSharedServiceBusTopicName")]
     [TestCase("VerifyNotEmployedQueueName")]
     [TestCase("VerifyNotEmployedSubscriptionName")]
     [TestCase("EmploymentCheckCompletedQueueName")]
@@ -77,7 +79,9 @@ public class MessagingInfrastructureOptionsTests
             Assert.That(routes, Has.Count.EqualTo(2));
             Assert.That(routes[0].RuleName, Is.EqualTo("VerifyNotEmployed"));
             Assert.That(routes[1].RuleName, Is.EqualTo("EmploymentCheckCompletedEvent"));
-            Assert.That(routes.Select(route => route.TopicName), Is.EqualTo(new[] { "test-topic", "test-topic" }));
+            Assert.That(routes.Select(route => route.TopicName), Is.EqualTo(new[] { "payments-topic", "das-topic" }));
+            Assert.That(routes[0].Namespace, Is.EqualTo(ServiceBusNamespace.Payments));
+            Assert.That(routes[1].Namespace, Is.EqualTo(ServiceBusNamespace.DasShared));
             Assert.That(routes[0].QueueName, Is.EqualTo("command-queue"));
             Assert.That(routes[0].SubscriptionName, Is.EqualTo("command-subscription"));
             Assert.That(routes[1].QueueName, Is.EqualTo("completion-queue"));
@@ -113,12 +117,27 @@ public class MessagingInfrastructureOptionsTests
 
     [TestCase("VerifyNotEmployedQueueName", "EmploymentCheckCompletedQueueName")]
     [TestCase("VerifyNotEmployedSubscriptionName", "EmploymentCheckCompletedSubscriptionName")]
-    public void Read_WhenRoutesShareAQueueOrSubscription_RejectsProvisioning(string firstSetting, string secondSetting)
+    public void Read_WhenRoutesShareNamesAcrossNamespaces_AllowsProvisioning(string firstSetting, string secondSetting)
     {
         configuration[secondSetting] = configuration[firstSetting]!.ToUpperInvariant();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => MessagingInfrastructureOptions.Read(configuration));
-
-        Assert.That(exception!.Message, Does.Contain("distinct queues and distinct topic/subscription pairs"));
+        configuration["DasSharedServiceBusTopicName"] = configuration["PaymentsServiceBusTopicName"];
+        Assert.That(MessagingInfrastructureOptions.Read(configuration).Enabled, Is.True);
+    }
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ValidateRoutes_RejectsDuplicateNamesWithinNamespace(bool duplicateQueue)
+    {
+        var routes = EvsRoutes.For(configuration);
+        routes[1].Namespace = routes[0].Namespace;
+        if (duplicateQueue)
+            routes[1].QueueName = routes[0].QueueName.ToUpperInvariant();
+        else
+        {
+            routes[1].TopicName = routes[0].TopicName;
+            routes[1].SubscriptionName = routes[0].SubscriptionName.ToUpperInvariant();
+        }
+        Assert.That(Assert.Throws<InvalidOperationException>(() => MessagingInfrastructureOptions.ValidateRoutes(routes))!.Message,
+            Does.Contain("within each namespace"));
     }
 }

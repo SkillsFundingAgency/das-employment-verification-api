@@ -1,3 +1,5 @@
+using System.Reflection;
+using Microsoft.Azure.Functions.Worker;
 using System.Text;
 using System.Text.Json;
 using Azure.Core.Serialization;
@@ -100,5 +102,17 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
 
         Assert.ThrowsAsync<TaskCanceledException>(() =>
             trigger.Run(message, source.Token));
+    }
+    [Test]
+    public void Run_UsesConfirmedConnectionAndExistingQueueBinding()
+    {
+        var binding = typeof(EmploymentCheckCompletedServiceBusTrigger).GetMethod("Run")!.GetParameters()
+            .Select(parameter => parameter.GetCustomAttribute<ServiceBusTriggerAttribute>())
+            .Single(attribute => attribute is not null)!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(binding.Connection, Is.EqualTo("DasSharedServiceBusConnection"));
+            Assert.That(binding.QueueName, Is.EqualTo("%EmploymentCheckCompletedQueueName%"));
+        });
     }
 }

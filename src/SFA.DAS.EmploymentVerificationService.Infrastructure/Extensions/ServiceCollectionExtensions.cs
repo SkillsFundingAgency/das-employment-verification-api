@@ -16,10 +16,10 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var serviceBusConnection = configuration["ServiceBusConnection"];
+        var serviceBusConnection = configuration["PaymentsServiceBusConnection"];
         if (string.IsNullOrWhiteSpace(serviceBusConnection))
         {
-            throw new InvalidOperationException("The ServiceBusConnection setting is required for employment verification publishing.");
+            throw new InvalidOperationException("The PaymentsServiceBusConnection setting is required for employment verification publishing.");
         }
 
         var topicName = configuration["VerifyNotEmployedCompletedTopicName"];
@@ -36,8 +36,11 @@ public static class ServiceCollectionExtensions
         if (provisioning.Enabled)
         {
             services.AddSingleton(provisioning);
-            services.AddSingleton(_ => new ServiceBusAdministrationClient(
-                configuration["ServiceBusAdministrationConnection"] ?? serviceBusConnection));
+            services.AddSingleton<IReadOnlyDictionary<ServiceBusNamespace, ServiceBusAdministrationClient>>(_ =>
+                provisioning.Routes.Select(route => route.Namespace).Distinct().ToDictionary(
+                    serviceBusNamespace => serviceBusNamespace,
+                    serviceBusNamespace => new ServiceBusAdministrationClient(
+                        ServiceBusNamespaceConnection.AdministrationConnection(configuration, serviceBusNamespace))));
             services.AddHostedService<SetupMessagingInfrastructure>();
         }
 

@@ -14,13 +14,13 @@ public static class EvsRoutes
 
     public static IReadOnlyList<MessagingRoute> For(IConfiguration configuration)
     {
-        var topicName = Required(configuration, "ServiceBusTopicName");
         return
         [
             new MessagingRoute
             {
                 RuleName = nameof(VerifyNotEmployed),
-                TopicName = topicName,
+                Namespace = ServiceBusNamespace.Payments,
+                TopicName = Required(configuration, "PaymentsServiceBusTopicName"),
                 QueueName = Required(configuration, "VerifyNotEmployedQueueName"),
                 SubscriptionName = Required(configuration, "VerifyNotEmployedSubscriptionName"),
                 SqlFilter = VerifyNotEmployedSqlFilter
@@ -28,7 +28,8 @@ public static class EvsRoutes
             new MessagingRoute
             {
                 RuleName = "EmploymentCheckCompletedEvent",
-                TopicName = topicName,
+                Namespace = ServiceBusNamespace.DasShared,
+                TopicName = Required(configuration, "DasSharedServiceBusTopicName"),
                 QueueName = Required(configuration, "EmploymentCheckCompletedQueueName"),
                 SubscriptionName = Required(configuration, "EmploymentCheckCompletedSubscriptionName"),
                 SqlFilter = EmploymentCheckCompletedSqlFilter

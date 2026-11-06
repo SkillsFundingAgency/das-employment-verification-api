@@ -10,7 +10,7 @@ public class EmploymentCheckCompletedServiceBusTrigger(IEmploymentCheckCompletio
 {
     [Function(nameof(EmploymentCheckCompletedServiceBusTrigger))]
     public async Task Run(
-        [ServiceBusTrigger("%EmploymentCheckCompletedQueueName%", Connection = "ServiceBusConnection")]
+        [ServiceBusTrigger("%EmploymentCheckCompletedQueueName%", Connection = "DasSharedServiceBusConnection")]
         EmploymentCheckCompletedEvent message,
         CancellationToken cancellationToken)
     {

@@ -163,3 +163,17 @@ _For Example_
 ```
 * Fails when built under VS2019
 ```
+
+## EVS Service Bus configuration (PV2-4341)
+
+EVS receives EmploymentCheckCompletedEvent from DAS Shared and VerifyNotEmployed
+from Payments/PV2. VerifyNotEmployedCompleted is published to Payments/PV2.
+Use DasSharedServiceBusConnection and PaymentsServiceBusConnection, with separate
+DasSharedServiceBusTopicName and PaymentsServiceBusTopicName incoming topics.
+VerifyNotEmployedCompletedTopicName independently selects the Payments outgoing topic.
+Optional namespace-specific administration connections are described in
+[EVS messaging infrastructure](docs/messaging-infrastructure.md), including the complete
+local settings example. Supply verified credentials; do not commit secrets.
+Keep ServiceBusSetupEnabled=false and ServiceBusFiltersReviewed=false while the
+local-testing DataLocks filter awaits separate verification. The older template
+examples above describe unrelated starter configuration, not EVS messaging settings.

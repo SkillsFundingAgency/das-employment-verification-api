@@ -9,7 +9,7 @@ public class VerifyNotEmployedServiceBusTrigger(IVerifyNotEmployedService servic
 {
     [Function(nameof(VerifyNotEmployedServiceBusTrigger))]
     public async Task Run(
-        [ServiceBusTrigger("%VerifyNotEmployedQueueName%", Connection = "ServiceBusConnection")]
+        [ServiceBusTrigger("%VerifyNotEmployedQueueName%", Connection = "PaymentsServiceBusConnection")]
         VerifyNotEmployed command,
         CancellationToken cancellationToken)
     {

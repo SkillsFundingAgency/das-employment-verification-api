@@ -1,3 +1,5 @@
+using System.Reflection;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
@@ -69,5 +71,17 @@ public class VerifyNotEmployedServiceBusTriggerTests
             trigger.Run(command, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
+    }
+    [Test]
+    public void Run_UsesConfirmedConnectionAndExistingQueueBinding()
+    {
+        var binding = typeof(VerifyNotEmployedServiceBusTrigger).GetMethod("Run")!.GetParameters()
+            .Select(parameter => parameter.GetCustomAttribute<ServiceBusTriggerAttribute>())
+            .Single(attribute => attribute is not null)!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(binding.Connection, Is.EqualTo("PaymentsServiceBusConnection"));
+            Assert.That(binding.QueueName, Is.EqualTo("%VerifyNotEmployedQueueName%"));
+        });
     }
 }

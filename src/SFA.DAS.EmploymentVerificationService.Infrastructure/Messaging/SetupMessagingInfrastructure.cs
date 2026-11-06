@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
 public sealed class SetupMessagingInfrastructure(
-    ServiceBusAdministrationClient client,
+    IReadOnlyDictionary<ServiceBusNamespace, ServiceBusAdministrationClient> clients,
     MessagingInfrastructureOptions options,
     IConfiguration configuration,
     ILogger<SetupMessagingInfrastructure> logger) : IHostedService
@@ -15,25 +15,33 @@ public sealed class SetupMessagingInfrastructure(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (!options.Enabled) return;
+        MessagingInfrastructureOptions.ValidateRoutes(options.Routes);
+        // Validate every namespace before making any infrastructure changes.
+        var connections = options.Routes.Select(route => route.Namespace).Distinct().ToDictionary(
+            serviceBusNamespace => serviceBusNamespace,
+            serviceBusNamespace => ServiceBusConnectionStringProperties.Parse(
+                ServiceBusNamespaceConnection.AdministrationConnection(configuration, serviceBusNamespace)));
         foreach (var route in options.Routes)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                await EnsureRouteAsync(route, cancellationToken);
-                logger.LogInformation("Ensured EVS messaging route {Topic}/{Subscription} to {Queue}",
-                    route.TopicName, route.SubscriptionName, route.QueueName);
+                var client = clients[route.Namespace];
+                await EnsureRouteAsync(client, connections[route.Namespace], route, cancellationToken);
+                logger.LogInformation("Ensured EVS messaging route {Namespace}: {Topic}/{Subscription} to {Queue}",
+                    route.Namespace, route.TopicName, route.SubscriptionName, route.QueueName);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Could not provision EVS route {Topic}/{Subscription}", route.TopicName, route.SubscriptionName);
+                logger.LogError(exception, "Could not provision EVS route {Namespace}: {Topic}/{Subscription}", route.Namespace, route.TopicName, route.SubscriptionName);
                 throw;
             }
         }
     }
 
-    private async Task EnsureRouteAsync(MessagingRoute route, CancellationToken cancellationToken)
+    private async Task EnsureRouteAsync(ServiceBusAdministrationClient client,
+        ServiceBusConnectionStringProperties connection, MessagingRoute route, CancellationToken cancellationToken)
     {
         if (!(await client.TopicExistsAsync(route.TopicName, cancellationToken)).Value)
             throw new InvalidOperationException($"Shared topic '{route.TopicName}' does not exist. EVS does not create shared topics.");
@@ -64,7 +72,7 @@ public sealed class SetupMessagingInfrastructure(
         }
 
         var subscription = (await client.GetSubscriptionAsync(route.TopicName, route.SubscriptionName, cancellationToken)).Value;
-        if (!ForwardsToQueue(subscription.ForwardTo, route.QueueName))
+        if (!ForwardsToQueue(subscription.ForwardTo, route.QueueName, connection))
             throw new InvalidOperationException(
                 $"Subscription '{route.TopicName}/{route.SubscriptionName}' forwards to '{subscription.ForwardTo}' instead of queue '{route.QueueName}' in the configured Service Bus namespace. Correct the forwarding destination before starting EVS.");
 
@@ -93,7 +101,7 @@ public sealed class SetupMessagingInfrastructure(
             await client.DeleteRuleAsync(route.TopicName, route.SubscriptionName, defaultRule.Name, cancellationToken);
     }
 
-    private bool ForwardsToQueue(string? forwardTo, string queueName)
+    private static bool ForwardsToQueue(string? forwardTo, string queueName, ServiceBusConnectionStringProperties connection)
     {
         if (string.Equals(forwardTo, queueName, StringComparison.OrdinalIgnoreCase))
             return true;
@@ -101,9 +109,6 @@ public sealed class SetupMessagingInfrastructure(
         if (!Uri.TryCreate(forwardTo, UriKind.Absolute, out var destination)
             || destination.Scheme is not ("http" or "https" or "sb"))
             return false;
-
-        var connection = ServiceBusConnectionStringProperties.Parse(
-            configuration["ServiceBusAdministrationConnection"] ?? configuration["ServiceBusConnection"]);
 
         return string.Equals(destination.Host, connection.FullyQualifiedNamespace, StringComparison.OrdinalIgnoreCase)
             && (destination.IsDefaultPort || destination.Port == connection.Endpoint.Port)
