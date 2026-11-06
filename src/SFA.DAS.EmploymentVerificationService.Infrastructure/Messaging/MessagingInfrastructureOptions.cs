@@ -1,24 +1,14 @@
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 
 namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
 public sealed class MessagingRoute
 {
-    public MessagingRoute(string ruleName, string topicName, string subscriptionName, string queueName, string sqlFilter)
-    {
-        RuleName = ruleName;
-        TopicName = topicName;
-        SubscriptionName = subscriptionName;
-        QueueName = queueName;
-        SqlFilter = sqlFilter;
-    }
-
-    public string RuleName { get; }
-    public string TopicName { get; }
-    public string SubscriptionName { get; }
-    public string QueueName { get; }
-    public string SqlFilter { get; }
+    public string RuleName { get; set; } = string.Empty;
+    public string TopicName { get; set; } = string.Empty;
+    public string SubscriptionName { get; set; } = string.Empty;
+    public string QueueName { get; set; } = string.Empty;
+    public string SqlFilter { get; set; } = string.Empty;
 }
 
 public sealed class MessagingInfrastructureOptions
@@ -32,54 +22,39 @@ public sealed class MessagingInfrastructureOptions
     public bool Enabled { get; }
     public IReadOnlyList<MessagingRoute> Routes { get; }
 
-    // Deliberately accept only a single property comparison. Arbitrary SQL can contain
-    // tautologies (including OR 1=1), which must never create a catch-all subscription.
-    private static readonly Regex PropertyComparison = new(
-        @"^\s*(?:sys\.Label|(?:user\.)?(?:\[[^\[\]\r\n]+\]|[A-Za-z_][A-Za-z0-9_]*))\s*(=|LIKE)\s*'((?:[^']|'')+)'\s*$",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-
     public static MessagingInfrastructureOptions Read(IConfiguration configuration)
     {
-        var enabled = ReadFlag(configuration, "ServiceBusSetupEnabled");
-        if (!enabled)
+        if (!configuration.GetValue<bool>("ServiceBusSetupEnabled"))
             return new(false, Array.Empty<MessagingRoute>());
 
-        if (!ReadFlag(configuration, "ServiceBusFiltersReviewed"))
-            throw new InvalidOperationException("ServiceBusFiltersReviewed must be true before enabling provisioning for both routes.");
+        if (!configuration.GetValue<bool>("ServiceBusFiltersReviewed"))
+            throw new InvalidOperationException("ServiceBusFiltersReviewed must be true before enabling messaging provisioning.");
 
-        var routes = new[] { "VerifyNotEmployed", "EmploymentCheckCompleted" }.Select(name =>
+        var routes = EvsRoutes.For(configuration);
+
+        var queues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var subscriptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var route in routes)
         {
-            var filter = Required(configuration, $"{name}Filter");
-            var match = PropertyComparison.Match(filter);
-            if (!match.Success || (match.Groups[1].Value.Equals("LIKE", StringComparison.OrdinalIgnoreCase)
-                && !match.Groups[2].Value.Any(char.IsLetterOrDigit)))
-                throw new InvalidOperationException($"{name}Filter must be a restrictive property = 'value' or property LIKE 'pattern' expression with a literal value. Compound SQL is not supported.");
+            if (string.IsNullOrWhiteSpace(route.RuleName) || string.IsNullOrWhiteSpace(route.TopicName)
+                || string.IsNullOrWhiteSpace(route.SubscriptionName) || string.IsNullOrWhiteSpace(route.QueueName))
+                throw new InvalidOperationException("Each messaging route requires RuleName, TopicName, SubscriptionName and QueueName.");
 
-            return new MessagingRoute(
-                name == "EmploymentCheckCompleted" ? "EmploymentCheckCompletedEvent" : name,
-                Required(configuration, $"{name}Topic"),
-                Required(configuration, $"{name}Subscription"),
-                Required(configuration, $"{name}QueueName"), filter);
-        }).ToArray();
+            if (route.RuleName.Equals("$Default", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Messaging routes must use a named SQL rule other than $Default.");
 
-        if (routes[0].QueueName.Equals(routes[1].QueueName, StringComparison.OrdinalIgnoreCase)
-            || (routes[0].TopicName.Equals(routes[1].TopicName, StringComparison.OrdinalIgnoreCase)
-                && routes[0].SubscriptionName.Equals(routes[1].SubscriptionName, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("The two incoming routes must use distinct queues and distinct topic/subscription pairs.");
+            if (!queues.Add(route.QueueName) || !subscriptions.Add($"{route.TopicName}/{route.SubscriptionName}"))
+                throw new InvalidOperationException("Messaging routes must use distinct queues and distinct topic/subscription pairs.");
+        }
+
+        foreach (var route in routes)
+        {
+            if (string.IsNullOrWhiteSpace(route.SqlFilter))
+                throw new InvalidOperationException(route.RuleName == "VerifyNotEmployed"
+                    ? "The VerifyNotEmployed SQL filter in EvsRoutes is unresolved. DataLocks publishing metadata must be confirmed before enabling ServiceBusSetupEnabled."
+                    : $"The SQL filter for messaging rule '{route.RuleName}' is required for messaging provisioning.");
+        }
 
         return new(true, routes);
     }
-
-    private static bool ReadFlag(IConfiguration configuration, string key)
-    {
-        var value = configuration[key];
-        if (value is null) return false;
-        if (bool.TryParse(value, out var result)) return result;
-        throw new InvalidOperationException($"{key} must be true or false.");
-    }
-
-    private static string Required(IConfiguration configuration, string key) =>
-        string.IsNullOrWhiteSpace(configuration[key])
-            ? throw new InvalidOperationException($"{key} is required for messaging infrastructure provisioning.")
-            : configuration[key]!.Trim();
 }

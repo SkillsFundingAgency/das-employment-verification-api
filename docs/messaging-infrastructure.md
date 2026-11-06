@@ -1,148 +1,126 @@
 # EVS messaging infrastructure
 
-Both incoming routes use topic → filtered subscription → forwarding queue → existing
-typed ServiceBusTrigger. Provisioning uses Azure.Messaging.ServiceBus only. It does
-not create shared topics or change trigger bindings or automatic settlement.
+Incoming messages use a shared topic, a dedicated EVS subscription with one SQL
+rule, and an auto-forwarding queue. The existing typed Service Bus triggers consume
+the queues. EVS never creates the shared topic or changes other services'
+subscriptions. Outgoing `VerifyNotEmployedCompleted` messages use the existing
+publisher and a separately configured topic.
 
-| Direction | Message | Route |
+## Route definitions
+
+`EvsRoutes.For(configuration)` defines the two incoming routes in C#:
+
+| Message | Rule name | SQL filter |
 | --- | --- | --- |
-| Incoming | `VerifyNotEmployed` | Configured topic -> EVS filtered subscription -> command queue -> typed trigger |
-| Incoming | `EmploymentCheckCompletedEvent` | Configured topic -> EVS filtered subscription -> completion queue -> typed trigger |
-| Outgoing | `VerifyNotEmployedCompleted` | EVS publisher -> configured topic -> downstream consumer subscription |
+| `VerifyNotEmployed` | `VerifyNotEmployed` | Empty placeholder until DataLocks publishing metadata is confirmed |
+| `EmploymentCheckCompletedEvent` | `EmploymentCheckCompletedEvent` | Verified NServiceBus type filter below |
 
-EVS owns only the two incoming subscriptions and queues. The outgoing event does
-not require a third EVS subscription or queue; downstream consumers own their
-subscriptions and filters.
-
-Provisioning is disabled by default. Local settings keep setup and filter review
-disabled, and leave the unverified command filter empty. Do not enable setup against the shared namespace until both
-filters have been reviewed. The review flag records that external review; it does
-not verify publisher metadata.
-
-## Configuration
-
-The outgoing publisher settings are required independently of provisioning:
-
-| Key | Meaning |
-| --- | --- |
-| `ServiceBusConnection` | Existing Service Bus connection string used by the sender and triggers |
-| `VerifyNotEmployedCompletedTopicName` | Outgoing topic; configure as `bundle-1` for local development |
-
-The singleton `ServiceBusClient` creates a reusable `ServiceBusSender` for the
-configured outgoing topic. `EmploymentVerificationPublisher` retains JSON
-serialization, `ContentType = application/json`, `Subject = VerifyNotEmployedCompleted`,
-and the event's correlation ID. It passes cancellation to the sender and propagates
-send exceptions. It neither creates nor validates the topic remotely during DI
-registration. The destination must already exist and the credential needs Send
-permission on that topic.
-
-Set the following incoming provisioning settings only after review:
-
-| Key | Meaning |
-| --- | --- |
-| `ServiceBusSetupEnabled` | Explicit opt-in; defaults to false |
-| `ServiceBusFiltersReviewed` | Must explicitly be true when enabled; covers both filters |
-| `VerifyNotEmployedTopic` | Command topic; `bundle-1` locally |
-| `VerifyNotEmployedSubscription` | Dedicated EVS command subscription |
-| `VerifyNotEmployedFilter` | Required reviewed command filter; no default |
-| `VerifyNotEmployedQueueName` | Existing command trigger queue setting |
-| `EmploymentCheckCompletedTopic` | Completion topic; `bundle-1` locally |
-| `EmploymentCheckCompletedSubscription` | Dedicated EVS completion subscription |
-| `EmploymentCheckCompletedFilter` | Required completion filter shown below |
-| `EmploymentCheckCompletedQueueName` | Existing completion trigger queue setting |
-| `ServiceBusAdministrationConnection` | Optional Manage connection string; falls back to `ServiceBusConnection` |
-
-All configuration keys are flat and use the same names in local `Values` and Azure
-application settings; no section prefix or double underscores are needed. The existing
-`ServiceBusConnection` and `VerifyNotEmployedCompletedTopicName` publisher settings
-remain required. The two routes must use distinct queues and distinct subscription
-pairs. Forwarding destinations must be in the topic's namespace.
-
-Each EVS subscription and its forwarding queue must have exactly the same name:
-`sfa-das-evs-verify-not-employed` for commands and
-`sfa-das-evs-employment-check-completed` for completion events. Both incoming
-routes use the existing `bundle-1` topic locally.
-
-All three topic names are environment-specific configuration; none is hardcoded.
-For local development, configure both incoming topics and the outgoing topic as
-`bundle-1`. In deployed environments, supply the appropriate topic names, dedicated
-EVS subscription/queue names, reviewed filters and credentials through the existing
-environment configuration. The sender and triggers use `ServiceBusConnection`;
-the optional administration connection must point to the same namespace. Ensure
-that configuration and trigger queue names agree. Outgoing publishing works while
-incoming provisioning remains disabled. The local settings file contains the values
-below and preserves the existing storage, worker runtime, SQL and Service Bus
-connection values. Deployed environment settings must be migrated to these flat
-names; there is no fallback to the former nested keys or former outgoing setting.
-
-### Local settings
-
-| Key | Local value |
-| --- | --- |
-| `ServiceBusSetupEnabled` | `false` |
-| `ServiceBusFiltersReviewed` | `false` |
-| `VerifyNotEmployedTopic` | `bundle-1` |
-| `VerifyNotEmployedSubscription` | `sfa-das-evs-verify-not-employed` |
-| `VerifyNotEmployedQueueName` | `sfa-das-evs-verify-not-employed` |
-| `VerifyNotEmployedFilter` | Empty string until publisher metadata is confirmed |
-| `EmploymentCheckCompletedTopic` | `bundle-1` |
-| `EmploymentCheckCompletedSubscription` | `sfa-das-evs-employment-check-completed` |
-| `EmploymentCheckCompletedQueueName` | `sfa-das-evs-employment-check-completed` |
-| `EmploymentCheckCompletedFilter` | Verified SQL expression below |
-| `VerifyNotEmployedCompletedTopicName` | `bundle-1` |
-
-Keep the current `AzureWebJobsStorage`, `FUNCTIONS_WORKER_RUNTIME`,
-`SqlConnectionString` and `ServiceBusConnection` values unchanged. Connection
-values are intentionally omitted from this document. `ServiceBusAdministrationConnection`
-remains optional and falls back to `ServiceBusConnection` when absent.
-
-With setup disabled, provisioning route validation and hosted-service registration
-are skipped. The review flag alone never enables setup. Enabling setup requires
-explicit review and valid restrictive filters for both routes; the empty command
-filter must be resolved first. Existing trigger bindings still use the queue-name
-keys above, and no trigger or publisher implementation changes are required.
-
-The verified completion filter is:
+The completion filter is:
 
 ```sql
 [NServiceBus.EnclosedMessageTypes] LIKE '%SFA.DAS.EmploymentCheck.Types.EmploymentCheckCompletedEvent%'
 ```
 
-The actual VerifyNotEmployed publisher metadata remains unverified. Do not infer
-its filter from the completion publisher or EVS's outgoing Subject header. Obtain
-the publisher's actual Subject/application properties before configuring it.
+The exact command CLR type is
+`SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands.VerifyNotEmployed`.
+This does not prove DataLocks publishes it through NServiceBus or sets that header.
+The command SQL filter is deliberately an empty constant in `EvsRoutes.cs`, with a
+TODO to confirm the actual publisher metadata. It is not a wildcard or a working
+filter. Enabled provisioning fails with an explicit DataLocks metadata error until
+this filter is resolved, even when all settings and the review flag are present.
+Do not infer the filter from a package reference, the command namespace or EVS's
+outgoing Subject.
 
-To exclude unrestricted SQL, configuration accepts one property equality or LIKE
-comparison with a quoted literal. LIKE patterns must contain a literal letter or
-digit. Examples of supported property syntax are `sys.Label`, `[messageType]`, and
-`user.[message-type]`. Compound expressions, tautologies and wildcard-only patterns
-are rejected. More complex filters require a separate reviewed implementation.
+SQL filters and rule names live beside their route definitions because they describe
+message contracts and publisher metadata, rather than environment-specific Azure
+resources. There is no custom SQL parser and no filter app setting. Adding a future
+incoming message route requires another definition in `EvsRoutes` and appropriate
+resource settings, without changing `SetupMessagingInfrastructure`.
 
-## Startup and existing entities
+## Application settings
 
-All route configuration is validated before provisioning starts. The hosted service
-checks that each shared topic exists, ensures each queue exists, then creates each
-subscription with its required rule atomically. It never creates a subscription
-with a default pass-through filter. New queues use the Collection Period reference
-settings: seven-day TTL, expiry dead-lettering, five-minute locks, delivery count
-50 and 5,120 MB capacity. Existing queue settings are preserved.
+In Functions `local.settings.json`, keep these string settings inside the existing
+`Values` object. Supply the same flat names in each Azure Function application's
+settings, using that environment's existing resource names:
 
-Existing EVS subscriptions are checked once for the expected ForwardTo destination
-and required SQL filter, with no rule action. Owned rule names are
-`VerifyNotEmployed` and `EmploymentCheckCompletedEvent`. Missing or incorrect rules,
-incorrect forwarding and unexpected additional rules fail startup with a clear
-exception; EVS does not repair them. Correct subscriptions are left unchanged,
-except that `$Default` is removed after forwarding and the required SQL filter
-have both been confirmed. No rules are removed if validation fails. Use dedicated
-EVS subscriptions, not subscriptions owned by other applications.
+```json
+{
+  "ServiceBusSetupEnabled": "false",
+  "ServiceBusFiltersReviewed": "false",
+  "ServiceBusTopicName": "bundle-1",
+  "VerifyNotEmployedQueueName": "sfa-das-evs-verify-not-employed",
+  "VerifyNotEmployedSubscriptionName": "sfa-das-evs-verify-not-employed",
+  "EmploymentCheckCompletedQueueName": "sfa-das-evs-employment-check-completed",
+  "EmploymentCheckCompletedSubscriptionName": "sfa-das-evs-employment-check-completed",
+  "VerifyNotEmployedCompletedTopicName": "bundle-1"
+}
+```
 
-Cancellation flows to every administration call. Permission errors, concurrent
-creation/deletion conflicts and other administration failures propagate and fail
-startup. Startup is not transactional across routes: a failure can leave a route
-partially provisioned. Resolve incorrect existing configuration before restarting.
+`ServiceBusTopicName` supplies the incoming shared topic for both routes. Each route
+reads its queue and subscription from separate settings; there is no assumption
+that queue and subscription names match across environments. Trigger bindings
+continue using `%VerifyNotEmployedQueueName%` and
+`%EmploymentCheckCompletedQueueName%`, so provisioning and processing use the same
+queue settings. No physical resource names are hardcoded in C#.
 
-The administration credential needs Service Bus Manage rights covering source
-topics/subscriptions/rules and destination queues, including queue creation. A
-Send/Listen-only credential is insufficient. Runtime still needs Listen on the two
-queues and Send on the configured outgoing topic. No NServiceBus dependency is
-introduced. HTTP Employment Check client implementation is outside this change.
+`VerifyNotEmployedCompletedTopicName` independently controls the outgoing sender.
+Do not replace it with `ServiceBusTopicName`. Locally, both settings retain `bundle-1`.
+The publisher's JSON, Subject, correlation ID and cancellation behaviour are unchanged.
+
+Keep existing `ServiceBusConnection`, optional `ServiceBusAdministrationConnection`,
+`AzureWebJobsStorage`, `FUNCTIONS_WORKER_RUNTIME` and `SqlConnectionString` values.
+The optional administration connection falls back to `ServiceBusConnection` and
+must address the same namespace as the source topic and destination queues.
+Connection values are intentionally omitted from the example.
+
+## DevOps migration
+
+For each environment:
+
+- Add `ServiceBusTopicName` using the existing incoming topic. Confirm both publisher
+  routes use this topic and namespace; do not change the actual destination.
+- Add `VerifyNotEmployedSubscriptionName` and
+  `EmploymentCheckCompletedSubscriptionName` using the existing subscriptions.
+- Retain both trigger queue settings and the separate outgoing topic setting.
+- Retain both Service Bus connection settings where configured.
+- Remove the previous indexed route settings. There is no fallback to them, and
+  rule names and filters no longer come from application settings.
+- Keep `ServiceBusSetupEnabled=false` and `ServiceBusFiltersReviewed=false`.
+
+No resource should be renamed or recreated as part of this settings migration.
+Check the Function application's effective settings source: the checked-in ARM
+and pipeline templates do not currently supply these messaging values explicitly.
+`ConfigNames` alone does not establish that the isolated worker loads Azure Table
+configuration. No pipeline changes are part of this implementation.
+
+## Validation and startup
+
+Disabled provisioning returns disabled options with no routes, without requiring
+route settings, filter review or resolution of the DataLocks placeholder. The
+outgoing sender still requires its connection and outgoing topic independently.
+
+When provisioning is enabled, filter review is required. Every physical resource
+setting must be non-empty; missing-setting exceptions identify the setting by name.
+Routes require all fields, a named rule other than `$Default`, distinct queues,
+distinct topic/subscription pairs and non-empty SQL filters. Enabled provisioning
+currently fails because the DataLocks filter remains unresolved. Do not enable it
+until the publisher metadata is verified, the correct filter is defined in code,
+and all filters and environment resource names have been reviewed.
+
+The hosted service's behaviour is unchanged. It checks that the shared topic exists,
+creates missing queues, and creates missing subscriptions with ForwardTo and the SQL
+rule in the same call. There is no temporary wildcard filter. New entities retain
+seven-day TTL, expiry dead-lettering, five-minute locks and maximum delivery count
+50; queues retain capacity 5,120 MB. Existing queue settings are left unchanged.
+
+Existing subscriptions are checked once for the expected ForwardTo destination
+and named SQL rule's exact expression, with no rule action. Missing/incorrect rules,
+incorrect forwarding and unexpected additional rules fail startup. There is no
+repair or reconciliation. `$Default` is removed only after the correct forwarding
+and required filter have been confirmed. Validation failures remove no rules.
+
+Cancellation flows to every administration call. Permission failures, concurrent
+creation/deletion conflicts and other administration errors fail startup. Startup
+is not transactional across routes; correct invalid existing configuration before
+restarting. Provisioning requires Manage rights; runtime needs Listen on the queues
+and Send on the outgoing topic.
