@@ -6,8 +6,8 @@ namespace SFA.DAS.EmploymentVerificationService.Data;
 public class EmploymentVerificationDbContext(DbContextOptions<EmploymentVerificationDbContext> options)
     : DbContext(options)
 {
-    public DbSet<EmploymentCheckRequest> EmploymentCheckRequests => Set<EmploymentCheckRequest>();
-    public DbSet<EmploymentCheckResponse> EmploymentCheckResponses => Set<EmploymentCheckResponse>();
+    public DbSet<EmploymentVerificationRequest> EmploymentVerificationRequests => Set<EmploymentVerificationRequest>();
+    public DbSet<EmploymentVerificationResponse> EmploymentVerificationResponses => Set<EmploymentVerificationResponse>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

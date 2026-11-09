@@ -4,9 +4,9 @@ using SFA.DAS.EmploymentVerificationService.Data.Entities;
 
 namespace SFA.DAS.EmploymentVerificationService.Data.Configurations;
 
-public class EmploymentCheckResponseConfiguration : IEntityTypeConfiguration<EmploymentCheckResponse>
+public class EmploymentVerificationResponseConfiguration : IEntityTypeConfiguration<EmploymentVerificationResponse>
 {
-    public void Configure(EntityTypeBuilder<EmploymentCheckResponse> builder)
+    public void Configure(EntityTypeBuilder<EmploymentVerificationResponse> builder)
     {
         builder.ToTable("EmploymentVerificationResponse", "EVS");
         builder.HasKey(x => x.Id).HasName("PK_EmploymentCheckResponse");

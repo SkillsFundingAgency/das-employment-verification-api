@@ -32,8 +32,8 @@ public sealed class TestRunBindings(TestSession scenario)
                 var database = scenario.DataContext;
                 var correlationId = scenario.Command.CorrelationId;
                 await using var transaction = await database.Database.BeginTransactionAsync();
-                await database.EmploymentCheckResponses.Where(response => response.CorrelationId == correlationId).ExecuteDeleteAsync();
-                await database.EmploymentCheckRequests.Where(request => request.CorrelationId == correlationId).ExecuteDeleteAsync();
+                await database.EmploymentVerificationResponses.Where(response => response.CorrelationId == correlationId).ExecuteDeleteAsync();
+                await database.EmploymentVerificationRequests.Where(request => request.CorrelationId == correlationId).ExecuteDeleteAsync();
                 await transaction.CommitAsync();
             }
         }

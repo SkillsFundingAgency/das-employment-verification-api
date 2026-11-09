@@ -1,6 +1,6 @@
 namespace SFA.DAS.EmploymentVerificationService.Data.Entities;
 
-public class EmploymentCheckRequest
+public class EmploymentVerificationRequest
 {
     public long Id { get; set; }
     public Guid CorrelationId { get; set; }
@@ -11,6 +11,7 @@ public class EmploymentCheckRequest
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public int NumberOfAttempts { get; set; }
+    public int NumberOfFailures { get; set; }
     public byte Status { get; set; }
     public DateTime CreatedOn { get; set; }
 }

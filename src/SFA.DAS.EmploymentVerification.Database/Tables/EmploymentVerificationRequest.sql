@@ -10,6 +10,7 @@ CREATE TABLE [EVS].[EmploymentVerificationRequest]
   EndDate DATETIME2(7) NOT NULL,
   NumberOfAttempts INT NOT NULL,
   Status TINYINT NOT NULL,
-  CreatedOn DATETIME2(7) NOT NULL
+  CreatedOn DATETIME2(7) NOT NULL,
+  NumberOfFailures INT NOT NULL CONSTRAINT DF_EmploymentVerificationRequest_NumberOfFailures DEFAULT (0)
 );
 GO

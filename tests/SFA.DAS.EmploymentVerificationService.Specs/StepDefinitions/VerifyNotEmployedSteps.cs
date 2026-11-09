@@ -18,7 +18,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     [Given("a VerifyNotEmployed check has been published by a consuming service")]
     public async Task PublishedRequest()
     {
-        requestWasNew = !await scenario.DataContext.EmploymentCheckRequests.AnyAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
+        requestWasNew = !await scenario.DataContext.EmploymentVerificationRequests.AnyAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
         Assert.That(requestWasNew, Is.True);
     }
 
@@ -34,7 +34,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     {
         // This condition is captured before the preceding When invokes the service.
         Assert.That(requestWasNew, Is.True);
-        Assert.That(await scenario.DataContext.EmploymentCheckRequests.CountAsync(request => request.CorrelationId == scenario.Command.CorrelationId), Is.EqualTo(1));
+        Assert.That(await scenario.DataContext.EmploymentVerificationRequests.CountAsync(request => request.CorrelationId == scenario.Command.CorrelationId), Is.EqualTo(1));
     }
 
     [Given("the employment check result has been received from the Employment Check service")]
@@ -82,7 +82,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     public async Task ResultMatchesRequest()
     {
         Assert.That(completion, Is.Not.Null);
-        var request = await scenario.DataContext.EmploymentCheckRequests.AsNoTracking()
+        var request = await scenario.DataContext.EmploymentVerificationRequests.AsNoTracking()
             .SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
         Assert.That(completion!.CorrelationId, Is.EqualTo(request.CorrelationId));
     }
@@ -99,7 +99,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
 
     private async Task AssertRequestStatus(EmploymentCheckStatus status)
     {
-        var request = await scenario.DataContext.EmploymentCheckRequests.AsNoTracking().SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
+        var request = await scenario.DataContext.EmploymentVerificationRequests.AsNoTracking().SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
         Assert.Multiple(() =>
         {
             Assert.That(request.CorrelationId, Is.EqualTo(scenario.Command.CorrelationId));
@@ -109,6 +109,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
             Assert.That(request.Reference, Is.EqualTo(scenario.Command.Reference));
             Assert.That(request.StartDate, Is.EqualTo(scenario.Command.StartDate));
             Assert.That(request.EndDate, Is.EqualTo(scenario.Command.StartDate.AddDays(30)));
+            Assert.That(request.NumberOfFailures, Is.Zero);
             Assert.That(request.Status, Is.EqualTo((byte)status));
         });
     }
@@ -116,7 +117,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     [When("this is the first attempt for this verify request")]
     public async Task InitialAttemptCount()
     {
-        var request = await scenario.DataContext.EmploymentCheckRequests.AsNoTracking().SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
+        var request = await scenario.DataContext.EmploymentVerificationRequests.AsNoTracking().SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
         Assert.That(request.NumberOfAttempts, Is.EqualTo(1));
     }
 
@@ -153,7 +154,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     [Then("^the result is stored in the EmploymentVerificationResponse table with Employed=(True|False)$")]
     public async Task ResponseWasSaved(bool employed)
     {
-        var response = await scenario.DataContext.EmploymentCheckResponses.AsNoTracking().SingleAsync(response => response.CorrelationId == scenario.Command.CorrelationId);
+        var response = await scenario.DataContext.EmploymentVerificationResponses.AsNoTracking().SingleAsync(response => response.CorrelationId == scenario.Command.CorrelationId);
         Assert.Multiple(() =>
         {
             Assert.That(response.CorrelationId, Is.EqualTo(scenario.Command.CorrelationId));

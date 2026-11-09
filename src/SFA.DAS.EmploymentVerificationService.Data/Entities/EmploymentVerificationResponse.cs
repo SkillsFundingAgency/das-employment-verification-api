@@ -1,6 +1,6 @@
 namespace SFA.DAS.EmploymentVerificationService.Data.Entities;
 
-public class EmploymentCheckResponse
+public class EmploymentVerificationResponse
 {
     public long Id { get; set; }
     public Guid CorrelationId { get; set; }
