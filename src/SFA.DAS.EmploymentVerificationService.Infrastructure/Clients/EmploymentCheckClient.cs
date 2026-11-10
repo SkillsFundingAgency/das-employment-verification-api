@@ -45,7 +45,6 @@ public sealed class EmploymentCheckClient(
         response.EnsureSuccessStatusCode();
 
         logger.LogInformation("Employment Check registration accepted for {CorrelationId}", request.CorrelationId);
-        // Transport failures, timeouts and cancellation propagate to the caller.
     }
 
     private class RegisterCheckRequest
