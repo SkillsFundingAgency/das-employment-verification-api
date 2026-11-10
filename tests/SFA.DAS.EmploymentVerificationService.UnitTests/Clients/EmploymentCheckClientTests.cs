@@ -107,11 +107,11 @@ public class EmploymentCheckClientTests
     [TestCase(200, "{\"errorType\":null,\"errorMessage\":null}")]
     [TestCase(200, "not-json")]
     [TestCase(204, "")]
-    public async Task SendAsync_AcceptsSuccessfulStatusWithoutParsingBody(int status, string body)
+    public void SendAsync_AcceptsSuccessfulStatusWithoutParsingBody(int status, string body)
     {
         send.ReturnsAsync(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent(body) });
 
-        await client.SendAsync(request, CancellationToken.None);
+        Assert.DoesNotThrowAsync(() => client.SendAsync(request, CancellationToken.None));
     }
 
     [TestCase(400)]

@@ -62,6 +62,11 @@ public sealed class MessagingInfrastructureOptions
                 throw new InvalidOperationException("Messaging routes must use distinct queues and distinct topic/subscription pairs within each namespace.");
         }
 
+        ValidateSqlFilters(routes);
+    }
+
+    private static void ValidateSqlFilters(IReadOnlyList<MessagingRoute> routes)
+    {
         foreach (var route in routes)
         {
             if (string.IsNullOrWhiteSpace(route.SqlFilter))
