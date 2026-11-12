@@ -10,11 +10,14 @@ public class MessageProcessorTests
     [Test]
     public async Task ProcessAsync_DeserializesCaseInsensitivePropertiesAndForwardsToken()
     {
+        // Arrange
         using var source = new CancellationTokenSource();
         var processor = new RecordingProcessor();
 
+        // Act
         await ((IMessageProcessor)processor).ProcessAsync(new BinaryData("{\"vAlUe\":\"example\"}"), source.Token);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(processor.Message?.Value, Is.EqualTo("example"));
@@ -36,10 +39,12 @@ public class MessageProcessorTests
     [Test]
     public void ProcessAsync_RejectsCancelledTokenBeforeDeserializing()
     {
+        // Arrange
         using var source = new CancellationTokenSource();
         source.Cancel();
         var processor = new RecordingProcessor();
 
+        // Act and Assert
         var exception = Assert.ThrowsAsync<OperationCanceledException>(() =>
             processor.ProcessAsync(new BinaryData("{"), source.Token));
 

@@ -57,6 +57,7 @@ public class EmploymentCheckClientTests
     [TestCase(456L, (long)int.MaxValue)]
     public async Task SendAsync_PostsMappedRequestWithoutAuthenticationInDevelopment(long? apprenticeshipId, long accountId)
     {
+        // Arrange
         request = request with { EmployerAccountIdentifier = accountId, ApprenticeshipId = apprenticeshipId };
         HttpRequestMessage outgoing = null!;
         string bodyText = null!;
@@ -67,8 +68,10 @@ public class EmploymentCheckClientTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
+        // Act
         await client.SendAsync(request, CancellationToken.None);
 
+        // Assert
         handler.Protected().Verify("SendAsync", Times.Once(),
             ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
         credential.VerifyNoOtherCalls();
@@ -142,9 +145,11 @@ public class EmploymentCheckClientTests
     [Test]
     public void SendAsync_PreCancelledRequestDoesNotSend()
     {
+        // Arrange
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
+        // Act and Assert
         Assert.ThrowsAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
 
         handler.Protected().Verify("SendAsync", Times.Never(),
@@ -155,6 +160,7 @@ public class EmploymentCheckClientTests
     [Test]
     public void SendAsync_CancelsInFlightRequest()
     {
+        // Arrange
         using var cancellation = new CancellationTokenSource();
         send.Returns(async (HttpRequestMessage _, CancellationToken token) =>
         {
@@ -163,12 +169,14 @@ public class EmploymentCheckClientTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
+        // Act and Assert
         Assert.CatchAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
     }
 
     [Test]
     public void SendAsync_PropagatesTimeout()
     {
+        // Arrange
         send.Returns(async (HttpRequestMessage _, CancellationToken token) =>
         {
             await Task.Delay(Timeout.Infinite, token);
@@ -176,6 +184,7 @@ public class EmploymentCheckClientTests
         });
         http.Timeout = TimeSpan.FromMilliseconds(50);
 
+        // Act and Assert
         var exception = Assert.CatchAsync<OperationCanceledException>(() => client.SendAsync(request, CancellationToken.None));
 
         Assert.That(exception!.InnerException, Is.TypeOf<TimeoutException>());
@@ -186,6 +195,7 @@ public class EmploymentCheckClientTests
     [TestCase("")]
     public async Task SendAsync_AcquiresTokenPerRequestOutsideDevelopment(string environmentName)
     {
+        // Arrange
         environment.SetupGet(x => x.EnvironmentName).Returns(environmentName);
         using var cancellation = new CancellationTokenSource();
         credential.Setup(x => x.GetTokenAsync(It.Is<TokenRequestContext>(context =>
@@ -195,9 +205,11 @@ public class EmploymentCheckClientTests
         send.Callback<HttpRequestMessage, CancellationToken>((message, _) => headers.Add(message.Headers.Authorization))
             .ReturnsAsync(() => new HttpResponseMessage(HttpStatusCode.OK));
 
+        // Act
         await client.SendAsync(request, cancellation.Token);
         await client.SendAsync(request, cancellation.Token);
 
+        // Assert
         Assert.That(headers.Select(header => header?.ToString()), Is.EqualTo(new[] { "Bearer fake-token", "Bearer fake-token" }));
         credential.Verify(x => x.GetTokenAsync(It.IsAny<TokenRequestContext>(), cancellation.Token), Times.Exactly(2));
     }
@@ -205,6 +217,7 @@ public class EmploymentCheckClientTests
     [Test]
     public void SendAsync_TokenAcquisitionCancellationPreventsHttpRequest()
     {
+        // Arrange
         environment.SetupGet(x => x.EnvironmentName).Returns(Environments.Production);
         using var cancellation = new CancellationTokenSource();
         credential.Setup(x => x.GetTokenAsync(It.IsAny<TokenRequestContext>(), cancellation.Token))
@@ -214,6 +227,7 @@ public class EmploymentCheckClientTests
                 return ValueTask.FromCanceled<AccessToken>(cancellation.Token);
             });
 
+        // Act and Assert
         Assert.CatchAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
 
         handler.Protected().Verify("SendAsync", Times.Never(),
@@ -223,11 +237,13 @@ public class EmploymentCheckClientTests
     [Test]
     public void SendAsync_AuthenticationFailurePreventsHttpRequest()
     {
+        // Arrange
         environment.SetupGet(x => x.EnvironmentName).Returns(Environments.Production);
         var failure = new AuthenticationFailedException("Token acquisition failed");
         credential.Setup(x => x.GetTokenAsync(It.IsAny<TokenRequestContext>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(failure);
 
+        // Act and Assert
         var thrown = Assert.ThrowsAsync<AuthenticationFailedException>(() => client.SendAsync(request, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
@@ -238,13 +254,16 @@ public class EmploymentCheckClientTests
     [Test]
     public async Task SendAsync_UsesConfiguredEndpoint()
     {
+        // Arrange
         configuration["EmploymentCheckApiUrl"] = "https://example.invalid/custom/register?version=1";
         Uri? endpoint = null;
         send.Callback<HttpRequestMessage, CancellationToken>((message, _) => endpoint = message.RequestUri)
             .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK));
 
+        // Act
         await client.SendAsync(request, CancellationToken.None);
 
+        // Assert
         Assert.That(endpoint!.AbsoluteUri, Is.EqualTo(configuration["EmploymentCheckApiUrl"]));
     }
 }

@@ -23,6 +23,7 @@ public class VerifyNotEmployedProcessorTests
     [TestCase(null, null, null)]
     public async Task ProcessAsync_ForwardsCommandAndCancellationToken(int? duration, long? apprenticeshipId, string? reference)
     {
+        // Arrange
         var command = new VerifyNotEmployed
         {
             CorrelationId = Guid.NewGuid(),
@@ -39,8 +40,10 @@ public class VerifyNotEmployedProcessorTests
             .Callback<VerifyNotEmployed, CancellationToken>((message, _) => received = message)
             .Returns(Task.CompletedTask);
 
+        // Act
         await processor.ProcessAsync(BinaryData.FromObjectAsJson(command), cancellation.Token);
 
+        // Assert
         Assert.That(received, Is.Not.Null);
         Assert.Multiple(() =>
         {

@@ -27,6 +27,7 @@ public class EmploymentVerificationPublisherTests
     [TestCase("completion-topic", "completion-topic")]
     public async Task PublisherDestination_UsesDasSharedAndConfiguredTopic(string? outgoingTopic, string expectedTopic)
     {
+        // Arrange
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["DasSharedServiceBusConnection"] = "Endpoint=sb://das-shared.servicebus.windows.net/;SharedAccessKeyName=test;SharedAccessKey=dGVzdA==",
@@ -34,7 +35,11 @@ public class EmploymentVerificationPublisherTests
             ["VerifyNotEmployedCompletedTopicName"] = outgoingTopic
         }).Build();
         await using var provider = new ServiceCollection().AddInfrastructure(configuration).BuildServiceProvider();
+
+        // Act
         var destination = provider.GetRequiredService<ServiceBusSender>();
+
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(destination.FullyQualifiedNamespace, Is.EqualTo("das-shared.servicebus.windows.net"));
@@ -46,6 +51,7 @@ public class EmploymentVerificationPublisherTests
     [TestCase(123L, false)]
     public async Task PublishAsync_SendsContractAndMetadataWithCancellation(long? apprenticeshipId, bool notEmployed)
     {
+        // Arrange
         var message = new VerifyNotEmployedCompleted
         {
             CorrelationId = Guid.NewGuid(),
@@ -60,8 +66,10 @@ public class EmploymentVerificationPublisherTests
             .Callback<ServiceBusMessage, CancellationToken>((value, _) => sent = value)
             .Returns(Task.CompletedTask);
 
+        // Act
         await publisher.PublishAsync(message, cancellation.Token);
 
+        // Assert
         sender.Verify(x => x.SendMessageAsync(It.IsAny<ServiceBusMessage>(), cancellation.Token), Times.Once);
         Assert.That(sent, Is.Not.Null);
         Assert.That(sent!.ContentType, Is.EqualTo("application/json"));
@@ -83,10 +91,12 @@ public class EmploymentVerificationPublisherTests
     [Test]
     public void PublishAsync_PropagatesSendException()
     {
+        // Arrange
         var failure = new ServiceBusException("Send failed", ServiceBusFailureReason.ServiceCommunicationProblem);
         sender.Setup(x => x.SendMessageAsync(It.IsAny<ServiceBusMessage>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(failure);
 
+        // Act and Assert
         var actual = Assert.ThrowsAsync<ServiceBusException>(() =>
             publisher.PublishAsync(new VerifyNotEmployedCompleted(), CancellationToken.None));
 
@@ -96,11 +106,13 @@ public class EmploymentVerificationPublisherTests
     [Test]
     public void PublishAsync_PropagatesCancellation()
     {
+        // Arrange
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         sender.Setup(x => x.SendMessageAsync(It.IsAny<ServiceBusMessage>(), cancellation.Token))
             .Returns(Task.FromCanceled(cancellation.Token));
 
+        // Act and Assert
         Assert.ThrowsAsync<TaskCanceledException>(() =>
             publisher.PublishAsync(new VerifyNotEmployedCompleted(), cancellation.Token));
     }

@@ -24,14 +24,17 @@ public class EmploymentCheckRequestFactoryTests
     [TestCase(null, 60)]
     public void Create_UsesExplicitDurationOrSixtyDayDefault(int? duration, int expectedDays)
     {
+        // Arrange
         var command = new VerifyNotEmployed
         {
             StartDate = new DateTime(2026, 1, 20, 9, 30, 0, DateTimeKind.Utc),
             DurationInDays = duration
         };
 
+        // Act
         var request = factory.Create(command);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(request.StartDate, Is.EqualTo(command.StartDate));
@@ -42,8 +45,10 @@ public class EmploymentCheckRequestFactoryTests
     [Test]
     public void Create_SetsInitialStatusAndAttemptCount()
     {
+        // Act
         var request = factory.Create(new VerifyNotEmployed());
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(request.Status, Is.EqualTo((byte)EmploymentCheckStatus.InProgress));
@@ -55,6 +60,7 @@ public class EmploymentCheckRequestFactoryTests
     [TestCase(null, null)]
     public void Create_MapsIdentifiersAndReference(long? apprenticeshipId, string? reference)
     {
+        // Arrange
         var command = new VerifyNotEmployed
         {
             CorrelationId = Guid.NewGuid(),
@@ -64,8 +70,10 @@ public class EmploymentCheckRequestFactoryTests
             Reference = reference
         };
 
+        // Act
         var request = factory.Create(command);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(request.CorrelationId, Is.EqualTo(command.CorrelationId));
@@ -79,8 +87,10 @@ public class EmploymentCheckRequestFactoryTests
     [Test]
     public void Create_UsesCurrentUtcTimeFromTimeProvider()
     {
+        // Act
         var request = factory.Create(new VerifyNotEmployed());
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(request.CreatedOn, Is.EqualTo(Now.UtcDateTime));

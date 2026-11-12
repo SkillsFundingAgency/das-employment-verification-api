@@ -32,13 +32,6 @@ public sealed class MessageProcessorFactory : IMessageProcessorFactory
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var scope = logger.BeginScope(new Dictionary<string, object>
-        {
-            ["MessageId"] = message.MessageId,
-            ["DeliveryCount"] = message.DeliveryCount,
-            ["CorrelationId"] = message.CorrelationId
-        });
-
         if (!message.ApplicationProperties.TryGetValue(
                 ServiceBusMessageHeaders.EnclosedMessageTypes,
                 out var metadata))

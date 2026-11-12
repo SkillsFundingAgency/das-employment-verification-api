@@ -11,14 +11,17 @@ public class MessagingInfrastructureOptionsTests
     [Test]
     public void Read_UsesSingleConfiguredRouteAndCombinedFilter()
     {
+        // Arrange
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ServiceBusSetupEnabled"] = "true", ["EvsQueueName"] = "evs",
             ["EvsSubscriptionName"] = "evs-subscription"
         }).Build();
 
+        // Act
         var options = MessagingInfrastructureOptions.Read(configuration);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(options.TopicName, Is.EqualTo("bundle-1"));

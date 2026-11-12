@@ -42,6 +42,7 @@ public class VerifyNotEmployedServiceTests
     [Test]
     public async Task ProcessAsync_SavesNewRequestBeforeSendingSameRequest()
     {
+        // Arrange
         var expected = factory.Create(command);
         EmploymentCheckRequest? saved = null;
         var saveCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -54,8 +55,10 @@ public class VerifyNotEmployedServiceTests
                 Assert.That(request, Is.SameAs(saved)))
             .Returns(Task.CompletedTask);
 
+        // Act
         var processing = service.ProcessAsync(command, CancellationToken.None);
 
+        // Assert
         client.Verify(x => x.SendAsync(It.IsAny<EmploymentCheckRequest>(), It.IsAny<CancellationToken>()), Times.Never);
         saveCompleted.SetResult();
         await processing;
@@ -79,6 +82,7 @@ public class VerifyNotEmployedServiceTests
     [Test]
     public async Task ProcessAsync_PropagatesCancellationTokenToAllOperations()
     {
+        // Arrange
         using var source = new CancellationTokenSource();
         var token = source.Token;
         var expected = factory.Create(command);
@@ -86,8 +90,10 @@ public class VerifyNotEmployedServiceTests
         repository.Setup(x => x.SaveRequestAsync(expected, token)).Returns(Task.CompletedTask);
         client.Setup(x => x.SendAsync(expected, token)).Returns(Task.CompletedTask);
 
+        // Act
         await service.ProcessAsync(command, token);
 
+        // Assert
         repository.VerifyAll();
         client.VerifyAll();
     }
@@ -107,10 +113,12 @@ public class VerifyNotEmployedServiceTests
     [Test]
     public void ProcessAsync_SaveFailurePreventsSend()
     {
+        // Arrange
         var failure = new InvalidOperationException("Save failed");
         repository.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
         repository.Setup(x => x.SaveRequestAsync(factory.Create(command), CancellationToken.None)).ThrowsAsync(failure);
 
+        // Act and Assert
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(command, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));

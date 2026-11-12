@@ -53,14 +53,17 @@ public class MessageProcessorFactoryTests
     [TestCase(true)]
     public async Task ProcessAsync_DispatchesCommandAndPreservesToken(bool assemblyQualified)
     {
+        // Arrange
         using var cancellation = new CancellationTokenSource();
         var id = Guid.NewGuid();
         command.Setup(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(m => m.CorrelationId == id), cancellation.Token))
             .Returns(Task.CompletedTask);
 
+        // Act
         await factory.ProcessAsync(Message(assemblyQualified ? typeof(VerifyNotEmployed).AssemblyQualifiedName :
             typeof(VerifyNotEmployed).FullName, $"{{\"correlationId\":\"{id}\"}}"), cancellation.Token);
 
+        // Assert
         command.VerifyAll();
         completion.VerifyNoOtherCalls();
     }
@@ -69,6 +72,7 @@ public class MessageProcessorFactoryTests
     [TestCase(true)]
     public async Task ProcessAsync_DispatchesCompletionWithSemicolonMetadata(bool assemblyQualified)
     {
+        // Arrange
         using var cancellation = new CancellationTokenSource();
         var id = Guid.NewGuid();
         var date = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
@@ -77,8 +81,10 @@ public class MessageProcessorFactoryTests
         var body = JsonSerializer.Serialize(new EmploymentCheckCompletedEvent(id, false, date, "error"));
         var name = assemblyQualified ? typeof(EmploymentCheckCompletedEvent).AssemblyQualifiedName : typeof(EmploymentCheckCompletedEvent).FullName;
 
+        // Act
         await factory.ProcessAsync(Message($" ; Other.Base, Other;  {name} ; NServiceBus.IEvent, NServiceBus ; ", body), cancellation.Token);
 
+        // Assert
         completion.VerifyAll();
         command.VerifyNoOtherCalls();
     }
@@ -130,12 +136,15 @@ public class MessageProcessorFactoryTests
     [TestCase(true)]
     public void ProcessAsync_PropagatesProcessorFailure(bool synchronous)
     {
+        // Arrange
         var failure = new InvalidOperationException("failed");
         var processing = command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None));
         if (synchronous)
             processing.Throws(failure);
         else
             processing.ThrowsAsync(failure);
+
+        // Act and Assert
         Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() =>
             factory.ProcessAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None)), Is.SameAs(failure));
     }
@@ -143,9 +152,14 @@ public class MessageProcessorFactoryTests
     [Test]
     public async Task ProcessAsync_AwaitsProcessor()
     {
+        // Arrange
         var pending = new TaskCompletionSource();
         command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).Returns(pending.Task);
+
+        // Act
         var processing = factory.ProcessAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
+
+        // Assert
         Assert.That(processing.IsCompleted, Is.False);
         pending.SetResult();
         await processing;

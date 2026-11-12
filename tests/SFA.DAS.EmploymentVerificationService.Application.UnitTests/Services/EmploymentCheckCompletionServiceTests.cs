@@ -37,6 +37,7 @@ public class EmploymentCheckCompletionServiceTests
     [TestCase(true, false, null)]
     public async Task ProcessAsync_RecordsResultAndPublishesMappedMessage(bool employed, bool notEmployed, long? apprenticeshipId)
     {
+        // Arrange
         request = request with { ApprenticeshipId = apprenticeshipId };
         result = result with { EmploymentResult = employed };
         var expected = new EmploymentCheckCompletion(request.CorrelationId, employed, (byte)EmploymentCheckStatus.Completed, Now.UtcDateTime);
@@ -49,8 +50,10 @@ public class EmploymentCheckCompletionServiceTests
             message.EmployerAccountIdentifier == request.EmployerAccountIdentifier &&
             message.NotEmployed == notEmployed), CancellationToken.None)).Returns(Task.CompletedTask);
 
+        // Act
         await service.ProcessAsync(result, CancellationToken.None);
 
+        // Assert
         repository.VerifyAll();
         publisher.VerifyAll();
     }
@@ -58,6 +61,7 @@ public class EmploymentCheckCompletionServiceTests
     [Test]
     public async Task ProcessAsync_RecordsCurrentUtcTimeInsteadOfIncomingCheckDate()
     {
+        // Arrange
         EmploymentCheckCompletion? recorded = null;
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
         repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None))
@@ -65,8 +69,10 @@ public class EmploymentCheckCompletionServiceTests
             .Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None)).Returns(Task.CompletedTask);
 
+        // Act
         await service.ProcessAsync(result, CancellationToken.None);
 
+        // Assert
         Assert.That(recorded, Is.Not.Null);
         Assert.Multiple(() =>
         {
@@ -79,11 +85,14 @@ public class EmploymentCheckCompletionServiceTests
     [Test]
     public async Task ProcessAsync_IgnoresUnmatchedCorrelationId()
     {
+        // Arrange
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None))
             .ReturnsAsync((EmploymentCheckRequest?)null);
 
+        // Act
         await service.ProcessAsync(result, CancellationToken.None);
 
+        // Assert
         repository.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);
         repository.VerifyNoOtherCalls();
         publisher.VerifyNoOtherCalls();
@@ -92,13 +101,16 @@ public class EmploymentCheckCompletionServiceTests
     [Test]
     public async Task ProcessAsync_AwaitsPersistenceBeforePublishing()
     {
+        // Arrange
         var saved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
         repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None)).Returns(saved.Task);
         publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None)).Returns(Task.CompletedTask);
 
+        // Act
         var processing = service.ProcessAsync(result, CancellationToken.None);
 
+        // Assert
         publisher.VerifyNoOtherCalls();
         saved.SetResult();
         await processing;
@@ -109,10 +121,12 @@ public class EmploymentCheckCompletionServiceTests
     [Test]
     public void ProcessAsync_PersistenceFailurePreventsPublishing()
     {
+        // Arrange
         var failure = new InvalidOperationException("Save failed");
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
         repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None)).ThrowsAsync(failure);
 
+        // Act and Assert
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(result, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
@@ -122,14 +136,17 @@ public class EmploymentCheckCompletionServiceTests
     [Test]
     public async Task ProcessAsync_PropagatesCancellationToken()
     {
+        // Arrange
         using var source = new CancellationTokenSource();
         var token = source.Token;
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, token)).ReturnsAsync(request);
         repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), token)).Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), token)).Returns(Task.CompletedTask);
 
+        // Act
         await service.ProcessAsync(result, token);
 
+        // Assert
         repository.VerifyAll();
         publisher.VerifyAll();
     }
@@ -152,9 +169,11 @@ public class EmploymentCheckCompletionServiceTests
     [TestCase(true, " ")]
     public void ProcessAsync_RejectsUnsupportedFailureWithoutSavingOrPublishing(bool? employed, string? errorType)
     {
+        // Arrange
         result = result with { EmploymentResult = employed, ErrorType = errorType };
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
 
+        // Act and Assert
         Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(result, CancellationToken.None));
 
         repository.Verify(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None), Times.Once);

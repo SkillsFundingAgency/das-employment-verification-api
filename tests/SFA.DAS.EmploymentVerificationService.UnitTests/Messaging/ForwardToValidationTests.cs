@@ -84,6 +84,7 @@ public class ForwardToValidationTests
     [Test]
     public async Task StartAsync_CreatesOneForwardingSubscriptionWithOnlyCombinedRule()
     {
+        // Arrange
         client.Setup(x => x.QueueExistsAsync(QueueName, CancellationToken.None))
             .ReturnsAsync(Response.FromValue(false, Mock.Of<Response>()));
         client.Setup(x => x.CreateQueueAsync(It.Is<CreateQueueOptions>(q => q.Name == QueueName), CancellationToken.None))
@@ -96,8 +97,10 @@ public class ForwardToValidationTests
                     r.Filter is SqlRuleFilter && ((SqlRuleFilter)r.Filter).SqlExpression == SqlFilter), CancellationToken.None))
             .ReturnsAsync(Response.FromValue(subscription, Mock.Of<Response>())).Verifiable();
 
+        // Act
         await service.StartAsync(CancellationToken.None);
 
+        // Assert
         client.Verify();
         client.Verify(x => x.GetRulesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -107,6 +110,7 @@ public class ForwardToValidationTests
     [TestCase("unexpected")]
     public void StartAsync_RejectsIncompatibleExistingRulesWithoutDeletingResources(string problem)
     {
+        // Arrange
         var rules = problem switch
         {
             "missing" => Array.Empty<RuleProperties>(),
@@ -116,6 +120,8 @@ public class ForwardToValidationTests
         client.Setup(x => x.GetRulesAsync("bundle-1", QueueName, CancellationToken.None))
             .Returns(AsyncPageable<RuleProperties>.FromPages(
                 [Page<RuleProperties>.FromValues(rules, null, Mock.Of<Response>())]));
+
+        // Act and Assert
         Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None));
         client.Verify(x => x.DeleteRuleAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }

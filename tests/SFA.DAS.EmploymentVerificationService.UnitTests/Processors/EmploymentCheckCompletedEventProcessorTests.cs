@@ -25,6 +25,7 @@ public class EmploymentCheckCompletedEventProcessorTests
     [TestCase(null, "CheckFailed")]
     public async Task ProcessAsync_MapsCompletionAndForwardsCancellationToken(bool? employed, string errorType)
     {
+        // Arrange
         var correlationId = Guid.NewGuid();
         var checkDate = new DateTime(2026, 10, 30, 12, 34, 56, DateTimeKind.Utc).AddTicks(1234567);
         var message = new EmploymentCheckCompletedEvent(correlationId, employed, checkDate, errorType);
@@ -32,8 +33,10 @@ public class EmploymentCheckCompletedEventProcessorTests
         using var cancellation = new CancellationTokenSource();
         service.Setup(x => x.ProcessAsync(expected, cancellation.Token)).Returns(Task.CompletedTask);
 
+        // Act
         await processor.ProcessAsync(BinaryData.FromObjectAsJson(message), cancellation.Token);
 
+        // Assert
         service.Verify(x => x.ProcessAsync(expected, cancellation.Token), Times.Once);
         service.Verify(x => x.ProcessAsync(It.Is<EmploymentCheckResult>(result =>
             result.CheckDate.Kind == DateTimeKind.Utc), cancellation.Token), Times.Once);
