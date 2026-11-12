@@ -16,7 +16,9 @@ public class MessagingInfrastructureOptionsTests
             ["ServiceBusSetupEnabled"] = "true", ["EvsQueueName"] = "evs",
             ["EvsSubscriptionName"] = "evs-subscription"
         }).Build();
+
         var options = MessagingInfrastructureOptions.Read(configuration);
+
         Assert.Multiple(() =>
         {
             Assert.That(options.TopicName, Is.EqualTo("bundle-1"));
@@ -34,7 +36,9 @@ public class MessagingInfrastructureOptionsTests
     {
         var values = new Dictionary<string, string?> { ["ServiceBusSetupEnabled"] = "true",
             ["EvsQueueName"] = "evs", ["EvsSubscriptionName"] = "evs" };
+
         values.Remove(setting);
+
         Assert.Throws<InvalidOperationException>(() => MessagingInfrastructureOptions.Read(
             new ConfigurationBuilder().AddInMemoryCollection(values).Build()));
     }
