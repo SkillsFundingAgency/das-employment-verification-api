@@ -4,9 +4,9 @@ using SFA.DAS.EmploymentVerificationService.Functions.Processors;
 
 namespace SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 
-public class EmploymentVerificationServiceBusFunction(IMessageProcessorFactory factory)
+public class EmploymentVerificationServiceBusTrigger(IMessageProcessorFactory factory)
 {
-    [Function(nameof(EmploymentVerificationServiceBusFunction))]
+    [Function(nameof(EmploymentVerificationServiceBusTrigger))]
     public Task Run(
         [ServiceBusTrigger("%EvsQueueName%", Connection = "DasSharedServiceBusConnection", AutoCompleteMessages = true)]
         ServiceBusReceivedMessage message,

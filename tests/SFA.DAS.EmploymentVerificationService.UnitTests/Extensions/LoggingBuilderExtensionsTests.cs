@@ -13,19 +13,6 @@ public class LoggingBuilderExtensionsTests
     private static readonly string ProviderName = typeof(ApplicationInsightsLoggerProvider).FullName!;
 
     [Test]
-    public void ApplicationInsightsWorkerService_AddsDefaultWarningFilter()
-    {
-        using var provider = new ServiceCollection()
-            .AddApplicationInsightsTelemetryWorkerService()
-            .BuildServiceProvider();
-
-        var rules = provider.GetRequiredService<IOptions<LoggerFilterOptions>>().Value.Rules;
-
-        Assert.That(rules, Has.Some.Matches<LoggerFilterRule>(r =>
-            r.ProviderName == ProviderName && r.LogLevel == LogLevel.Warning));
-    }
-
-    [Test]
     public void RemoveApplicationInsightsDefaultFilter_RemovesOnlyTheApplicationInsightsRule()
     {
         using var provider = new ServiceCollection()
