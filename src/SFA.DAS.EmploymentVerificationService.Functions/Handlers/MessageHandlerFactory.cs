@@ -4,28 +4,26 @@ using Microsoft.Extensions.Logging;
 using SFA.DAS.EmploymentCheck.Types;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
-using System.Text.Json;
+using System.Collections.ObjectModel;
 
 namespace SFA.DAS.EmploymentVerificationService.Functions.Handlers;
 
 public sealed class MessageHandlerFactory : IMessageHandlerFactory
 {
-    private static readonly JsonSerializerOptions JsonOptions =
-        new() { PropertyNameCaseInsensitive = true };
+    private static readonly IReadOnlyDictionary<string, Type> Handlers =
+        new ReadOnlyDictionary<string, Type>(new Dictionary<string, Type>(StringComparer.Ordinal)
+        {
+            [typeof(VerifyNotEmployed).FullName!] = typeof(VerifyNotEmployedHandler),
+            [typeof(EmploymentCheckCompletedEvent).FullName!] = typeof(EmploymentCheckCompletedEventHandler)
+        });
 
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger<MessageHandlerFactory> logger;
-    private readonly Dictionary<string, Func<BinaryData, CancellationToken, Task>> handlers;
 
     public MessageHandlerFactory(IServiceProvider serviceProvider, ILogger<MessageHandlerFactory> logger)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
-        handlers = new(StringComparer.Ordinal)
-        {
-            [typeof(VerifyNotEmployed).FullName!] = HandleAsync<VerifyNotEmployed>,
-            [typeof(EmploymentCheckCompletedEvent).FullName!] = HandleAsync<EmploymentCheckCompletedEvent>
-        };
     }
 
     public async Task HandleAsync(
@@ -52,41 +50,28 @@ public sealed class MessageHandlerFactory : IMessageHandlerFactory
             throw new InvalidOperationException("Message type metadata must be a string.");
 
         string? selectedType = null;
-        Func<BinaryData, CancellationToken, Task>? selectedHandler = null;
+        Type? handlerType = null;
         foreach (var entry in enclosedMessageTypes.Split(';'))
         {
             var messageType = entry.Split(',')[0].Trim();
-            if (!handlers.TryGetValue(messageType, out var candidate))
+            if (!Handlers.TryGetValue(messageType, out var candidate))
                 continue;
 
             if (selectedType is not null && !string.Equals(selectedType, messageType, StringComparison.Ordinal))
                 throw new InvalidOperationException("Message metadata contains different supported message types.");
 
             selectedType = messageType;
-            selectedHandler = candidate;
+            handlerType = candidate;
         }
 
-        if (selectedHandler is null)
+        if (handlerType is null)
             throw new InvalidOperationException("No supported message type was found in the metadata.");
 
         logger.LogInformation(
             "Processing {MessageType}, MessageId {MessageId}",
             selectedType, message.MessageId);
 
-        await selectedHandler(message.Body, cancellationToken);
-    }
-
-    private Task HandleAsync<TMessage>(
-        BinaryData body,
-        CancellationToken cancellationToken) where TMessage : class
-    {
-        var handler =
-            serviceProvider.GetRequiredService<IMessageHandler<TMessage>>();
-
-        var message = JsonSerializer.Deserialize<TMessage>(
-            body.ToMemory().Span, JsonOptions)
-            ?? throw new JsonException("Invalid message body.");
-
-        return handler.HandleAsync(message, cancellationToken);
+        var handler = (IMessageHandler)serviceProvider.GetRequiredService(handlerType);
+        await handler.HandleAsync(message.Body, cancellationToken);
     }
 }

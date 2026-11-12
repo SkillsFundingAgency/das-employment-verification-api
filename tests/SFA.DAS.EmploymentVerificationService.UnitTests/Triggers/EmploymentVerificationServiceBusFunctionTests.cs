@@ -9,6 +9,8 @@ using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentCheck.Types;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
+using SFA.DAS.EmploymentVerificationService.Application.Services;
+using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Functions.Handlers;
 using SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
@@ -17,8 +19,8 @@ namespace SFA.DAS.EmploymentVerificationService.UnitTests.Triggers;
 
 public class EmploymentVerificationServiceBusFunctionTests
 {
-    private Mock<IMessageHandler<VerifyNotEmployed>> command = null!;
-    private Mock<IMessageHandler<EmploymentCheckCompletedEvent>> completion = null!;
+    private Mock<IVerifyNotEmployedService> command = null!;
+    private Mock<IEmploymentCheckCompletionService> completion = null!;
     private ServiceProvider provider = null!;
     private IServiceScope scope = null!;
     private IMessageHandlerFactory factory = null!;
@@ -32,8 +34,10 @@ public class EmploymentVerificationServiceBusFunctionTests
         completion = new(MockBehavior.Strict);
         scopes = new ScopeCapturingLoggerProvider();
         provider = new ServiceCollection().AddLogging(logging => logging.AddProvider(scopes))
-            .AddScoped<IMessageHandler<VerifyNotEmployed>>(_ => command.Object)
-            .AddScoped<IMessageHandler<EmploymentCheckCompletedEvent>>(_ => completion.Object)
+            .AddScoped<IVerifyNotEmployedService>(_ => command.Object)
+            .AddScoped<IEmploymentCheckCompletionService>(_ => completion.Object)
+            .AddScoped<VerifyNotEmployedHandler>()
+            .AddScoped<EmploymentCheckCompletedEventHandler>()
             .AddScoped<IMessageHandlerFactory, MessageHandlerFactory>()
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         scope = provider.CreateScope();
@@ -59,7 +63,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     {
         using var cancellation = new CancellationTokenSource();
         var id = Guid.NewGuid();
-        command.Setup(x => x.HandleAsync(It.Is<VerifyNotEmployed>(m => m.CorrelationId == id), cancellation.Token))
+        command.Setup(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(m => m.CorrelationId == id), cancellation.Token))
             .Returns(Task.CompletedTask);
         await function.Run(Message(assemblyQualified ? typeof(VerifyNotEmployed).AssemblyQualifiedName :
             typeof(VerifyNotEmployed).FullName, $"{{\"correlationId\":\"{id}\"}}"), cancellation.Token);
@@ -74,7 +78,7 @@ public class EmploymentVerificationServiceBusFunctionTests
         using var cancellation = new CancellationTokenSource();
         var id = Guid.NewGuid();
         var date = DateTime.UtcNow;
-        completion.Setup(x => x.HandleAsync(It.Is<EmploymentCheckCompletedEvent>(m =>
+        completion.Setup(x => x.ProcessAsync(It.Is<EmploymentCheckResult>(m =>
             m.CorrelationId == id && m.EmploymentResult == false && m.CheckDate == date && m.ErrorType == "error"),
             cancellation.Token)).Returns(Task.CompletedTask);
         var body = JsonSerializer.Serialize(new EmploymentCheckCompletedEvent(id, false, date, "error"));
@@ -107,18 +111,22 @@ public class EmploymentVerificationServiceBusFunctionTests
     [Test]
     public async Task Factory_AcceptsRepeatedSameConcreteType()
     {
-        command.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).Returns(Task.CompletedTask);
+        command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).Returns(Task.CompletedTask);
         await factory.HandleAsync(Message($"{typeof(VerifyNotEmployed).FullName};{typeof(VerifyNotEmployed).AssemblyQualifiedName}"), CancellationToken.None);
-        command.Verify(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Once);
+        command.Verify(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Once);
     }
 
-    [TestCase("{")]
-    [TestCase("null")]
-    [TestCase("{\"CorrelationId\":\"invalid\"}")]
-    public void Run_RejectsInvalidJson(string body)
+    [TestCase("{", false)]
+    [TestCase("null", false)]
+    [TestCase("{\"CorrelationId\":\"invalid\"}", false)]
+    [TestCase("{", true)]
+    [TestCase("null", true)]
+    [TestCase("{\"CorrelationId\":\"invalid\"}", true)]
+    public void Run_RejectsInvalidJson(string body, bool isCompletion)
     {
-        Assert.ThrowsAsync<JsonException>(() => function.Run(Message(typeof(VerifyNotEmployed).FullName, body), CancellationToken.None));
+        Assert.ThrowsAsync<JsonException>(() => function.Run(Message(isCompletion ? typeof(EmploymentCheckCompletedEvent).FullName : typeof(VerifyNotEmployed).FullName, body), CancellationToken.None));
         command.VerifyNoOtherCalls();
+        completion.VerifyNoOtherCalls();
     }
 
     [Test]
@@ -134,7 +142,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     public void Run_PropagatesHandlerCancellation()
     {
         using var cancellation = new CancellationTokenSource();
-        command.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), cancellation.Token))
+        command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), cancellation.Token))
             .Callback(() => cancellation.Cancel()).Returns(() => Task.FromCanceled(cancellation.Token));
         Assert.ThrowsAsync<TaskCanceledException>(() => function.Run(Message(typeof(VerifyNotEmployed).FullName), cancellation.Token));
     }
@@ -143,7 +151,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     public void Run_PropagatesHandlerFailure()
     {
         var failure = new InvalidOperationException("failed");
-        command.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).ThrowsAsync(failure);
+        command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).ThrowsAsync(failure);
         Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() =>
             function.Run(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None)), Is.SameAs(failure));
     }
@@ -152,7 +160,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     public async Task Run_AwaitsHandler()
     {
         var pending = new TaskCompletionSource();
-        command.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).Returns(pending.Task);
+        command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).Returns(pending.Task);
         var processing = function.Run(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
         Assert.That(processing.IsCompleted, Is.False);
         pending.SetResult();
@@ -173,7 +181,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     public async Task Run_InvokesHandlerWithinMessageLoggingScope()
     {
         IReadOnlyDictionary<string, object?>? active = null;
-        command.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
+        command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
             .Callback(() => active = scopes.ActiveScopeValues())
             .Returns(Task.CompletedTask);
         var message = ServiceBusModelFactory.ServiceBusReceivedMessage(BinaryData.FromString("{}"),
@@ -195,7 +203,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     [Test]
     public void Run_EndsLoggingScopeWhenProcessingFails()
     {
-        command.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
+        command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
             .ThrowsAsync(new InvalidOperationException("failed"));
 
         Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -206,16 +214,19 @@ public class EmploymentVerificationServiceBusFunctionTests
     [Test]
     public async Task Factory_ResolvesHandlerFromEachScope()
     {
-        var resolvedHandlers = new List<Mock<IMessageHandler<VerifyNotEmployed>>>();
+        var resolvedServices = new List<Mock<IVerifyNotEmployedService>>();
+        var resolvedHandlers = new List<VerifyNotEmployedHandler>();
         using var scopedProvider = new ServiceCollection()
             .AddLogging()
+            .AddScoped<VerifyNotEmployedHandler>()
+            .AddScoped<EmploymentCheckCompletedEventHandler>()
             .AddScoped<IMessageHandlerFactory, MessageHandlerFactory>()
-            .AddScoped<IMessageHandler<VerifyNotEmployed>>(_ =>
+            .AddScoped<IVerifyNotEmployedService>(_ =>
             {
-                var handler = new Mock<IMessageHandler<VerifyNotEmployed>>(MockBehavior.Strict);
-                handler.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
+                var handler = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
+                handler.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
                     .Returns(Task.CompletedTask);
-                resolvedHandlers.Add(handler);
+                resolvedServices.Add(handler);
                 return handler.Object;
             })
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
@@ -224,13 +235,18 @@ public class EmploymentVerificationServiceBusFunctionTests
         {
             using var messageScope = scopedProvider.CreateScope();
             var scopedFactory = messageScope.ServiceProvider.GetRequiredService<IMessageHandlerFactory>();
+            var scopedHandler = messageScope.ServiceProvider.GetRequiredService<VerifyNotEmployedHandler>();
+            resolvedHandlers.Add(scopedHandler);
+            Assert.That(messageScope.ServiceProvider.GetRequiredService<VerifyNotEmployedHandler>(), Is.SameAs(scopedHandler));
             await scopedFactory.HandleAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
             await scopedFactory.HandleAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
         }
 
         Assert.That(resolvedHandlers, Has.Count.EqualTo(2));
-        foreach (var handler in resolvedHandlers)
-            handler.Verify(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Exactly(2));
+        Assert.That(resolvedHandlers[0], Is.Not.SameAs(resolvedHandlers[1]));
+        Assert.That(resolvedServices, Has.Count.EqualTo(2));
+        foreach (var handler in resolvedServices)
+            handler.Verify(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Exactly(2));
     }
 
     [Test]

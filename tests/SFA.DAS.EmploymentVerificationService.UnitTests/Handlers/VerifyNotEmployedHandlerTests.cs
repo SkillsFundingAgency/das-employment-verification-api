@@ -21,7 +21,7 @@ public class VerifyNotEmployedHandlerTests
 
     [TestCase(30, 789L, "reference")]
     [TestCase(null, null, null)]
-    public async Task HandleAsync_ForwardsOriginalCommandInstance(int? duration, long? apprenticeshipId, string? reference)
+    public async Task HandleAsync_ForwardsDeserializedCommandValues(int? duration, long? apprenticeshipId, string? reference)
     {
         var command = new VerifyNotEmployed
         {
@@ -34,13 +34,19 @@ public class VerifyNotEmployedHandlerTests
             Reference = reference
         };
         service.Setup(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(received =>
-            ReferenceEquals(received, command)), CancellationToken.None))
+            received.CorrelationId == command.CorrelationId && received.ULN == command.ULN &&
+            received.EmployerAccountIdentifier == command.EmployerAccountIdentifier &&
+            received.ApprenticeshipId == command.ApprenticeshipId && received.StartDate == command.StartDate &&
+            received.DurationInDays == command.DurationInDays && received.Reference == command.Reference), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
-        await handler.HandleAsync(command, CancellationToken.None);
+        await handler.HandleAsync(BinaryData.FromObjectAsJson(command), CancellationToken.None);
 
         service.Verify(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(received =>
-            ReferenceEquals(received, command)), CancellationToken.None), Times.Once);
+            received.CorrelationId == command.CorrelationId && received.ULN == command.ULN &&
+            received.EmployerAccountIdentifier == command.EmployerAccountIdentifier &&
+            received.ApprenticeshipId == command.ApprenticeshipId && received.StartDate == command.StartDate &&
+            received.DurationInDays == command.DurationInDays && received.Reference == command.Reference), CancellationToken.None), Times.Once);
         service.VerifyNoOtherCalls();
     }
 
@@ -49,11 +55,11 @@ public class VerifyNotEmployedHandlerTests
     {
         using var source = new CancellationTokenSource();
         var command = new VerifyNotEmployed();
-        service.Setup(x => x.ProcessAsync(command, source.Token)).Returns(Task.CompletedTask);
+        service.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), source.Token)).Returns(Task.CompletedTask);
 
-        await handler.HandleAsync(command, source.Token);
+        await handler.HandleAsync(BinaryData.FromObjectAsJson(command), source.Token);
 
-        service.Verify(x => x.ProcessAsync(command, source.Token), Times.Once);
+        service.Verify(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), source.Token), Times.Once);
     }
 
     [Test]
@@ -61,10 +67,10 @@ public class VerifyNotEmployedHandlerTests
     {
         var command = new VerifyNotEmployed();
         var failure = new InvalidOperationException("Processing failed");
-        service.Setup(x => x.ProcessAsync(command, CancellationToken.None)).ThrowsAsync(failure);
+        service.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.HandleAsync(command, CancellationToken.None));
+            handler.HandleAsync(BinaryData.FromObjectAsJson(command), CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
