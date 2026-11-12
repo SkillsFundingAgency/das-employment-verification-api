@@ -5,35 +5,20 @@ using Microsoft.Extensions.Logging;
 namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
 public sealed class SetupMessagingInfrastructure(
-    IReadOnlyDictionary<ServiceBusNamespace, ServiceBusAdministrationClient> administrationClients,
+    ServiceBusAdministrationClient client,
     MessagingInfrastructureOptions options,
     ILogger<SetupMessagingInfrastructure> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (!options.Enabled) return;
-        MessagingInfrastructureOptions.ValidateRoutes(options.Routes);
-        foreach (var route in options.Routes)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var client = administrationClients[route.Namespace];
-                await EnsureRouteAsync(client, route, cancellationToken);
-                logger.LogInformation("Ensured EVS messaging route {Namespace}: {Topic}/{Subscription} to {Queue}",
-                    route.Namespace, route.TopicName, route.SubscriptionName, route.QueueName);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-            catch (Exception exception)
-            {
-                logger.LogError(exception, "Could not provision EVS route {Namespace}: {Topic}/{Subscription}", route.Namespace, route.TopicName, route.SubscriptionName);
-                throw;
-            }
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        await EnsureRouteAsync(options, cancellationToken);
+        logger.LogInformation("Ensured EVS messaging route {Topic}/{Subscription} to {Queue}",
+            options.TopicName, options.SubscriptionName, options.QueueName);
     }
 
-    private async Task EnsureRouteAsync(ServiceBusAdministrationClient client,
-        MessagingRoute route, CancellationToken cancellationToken)
+    private async Task EnsureRouteAsync(MessagingInfrastructureOptions route, CancellationToken cancellationToken)
     {
         if (!(await client.TopicExistsAsync(route.TopicName, cancellationToken)).Value)
             throw new InvalidOperationException($"Shared topic '{route.TopicName}' does not exist. EVS does not create shared topics.");
@@ -59,7 +44,7 @@ public sealed class SetupMessagingInfrastructure(
                 DeadLetteringOnMessageExpiration = true,
                 LockDuration = TimeSpan.FromMinutes(5),
                 MaxDeliveryCount = 50
-            }, new CreateRuleOptions(route.RuleName, new SqlRuleFilter(route.SqlFilter)), cancellationToken);
+            }, new CreateRuleOptions(MessagingInfrastructureOptions.RuleName, new SqlRuleFilter(MessagingInfrastructureOptions.SqlFilter)), cancellationToken);
             return;
         }
 
@@ -75,7 +60,7 @@ public sealed class SetupMessagingInfrastructure(
         RuleProperties? defaultRule = null;
         await foreach (var rule in client.GetRulesAsync(route.TopicName, route.SubscriptionName, cancellationToken))
         {
-            if (rule.Name == route.RuleName)
+            if (rule.Name == MessagingInfrastructureOptions.RuleName)
                 requiredRule = rule;
             else if (rule.Name.Equals(RuleProperties.DefaultRuleName, StringComparison.OrdinalIgnoreCase))
                 defaultRule = rule;
@@ -86,10 +71,10 @@ public sealed class SetupMessagingInfrastructure(
 
         if (requiredRule is null)
             throw new InvalidOperationException(
-                $"Subscription '{route.TopicName}/{route.SubscriptionName}' is missing required SQL filter rule '{route.RuleName}'. Configure it before starting EVS.");
-        if (requiredRule.Filter is not SqlRuleFilter filter || filter.SqlExpression != route.SqlFilter || requiredRule.Action is not null)
+                $"Subscription '{route.TopicName}/{route.SubscriptionName}' is missing required SQL filter rule '{MessagingInfrastructureOptions.RuleName}'. Configure it before starting EVS.");
+        if (requiredRule.Filter is not SqlRuleFilter filter || filter.SqlExpression != MessagingInfrastructureOptions.SqlFilter || requiredRule.Action is not null)
             throw new InvalidOperationException(
-                $"Subscription '{route.TopicName}/{route.SubscriptionName}' rule '{route.RuleName}' must use SQL filter '{route.SqlFilter}' with no rule action. Correct the rule before starting EVS.");
+                $"Subscription '{route.TopicName}/{route.SubscriptionName}' rule '{MessagingInfrastructureOptions.RuleName}' must use SQL filter '{MessagingInfrastructureOptions.SqlFilter}' with no rule action. Correct the rule before starting EVS.");
 
         // Remove the default rule
         if (defaultRule is not null)

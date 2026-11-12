@@ -1,37 +1,33 @@
-using System.Reflection;
-using Microsoft.Azure.Functions.Worker;
 using System.Text;
 using System.Text.Json;
 using Azure.Core.Serialization;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentCheck.Types;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
-using SFA.DAS.EmploymentVerificationService.Functions.Triggers;
+using SFA.DAS.EmploymentVerificationService.Functions.Handlers;
 
-namespace SFA.DAS.EmploymentVerificationService.UnitTests.Triggers;
+namespace SFA.DAS.EmploymentVerificationService.UnitTests.Handlers;
 
 [TestFixture]
-public class EmploymentCheckCompletedServiceBusTriggerTests
+public class EmploymentCheckCompletedEventHandlerTests
 {
     private Mock<IEmploymentCheckCompletionService> service = null!;
-    private EmploymentCheckCompletedServiceBusTrigger trigger = null!;
+    private EmploymentCheckCompletedEventHandler handler = null!;
 
     [SetUp]
     public void SetUp()
     {
         service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
-        trigger = new EmploymentCheckCompletedServiceBusTrigger(service.Object,
-            NullLogger<EmploymentCheckCompletedServiceBusTrigger>.Instance);
+        handler = new EmploymentCheckCompletedEventHandler(service.Object);
     }
 
     [TestCase("true", "", false)]
     [TestCase("false", "", false)]
     [TestCase("null", "CheckFailed", false)]
     [TestCase("null", "CheckFailed", true)]
-    public async Task Run_MapsDeserializedEvent(
+    public async Task HandleAsync_MapsDeserializedEvent(
         string resultJson, string errorType, bool camelCase)
     {
         var correlationId = Guid.NewGuid();
@@ -56,7 +52,7 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
         var expected = new EmploymentCheckResult(correlationId, employmentResult, checkDate, errorType);
         service.Setup(x => x.ProcessAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
 
-        await trigger.Run(message, CancellationToken.None);
+        await handler.HandleAsync(message, CancellationToken.None);
 
         Assert.That(message.CheckDate.Kind, Is.EqualTo(DateTimeKind.Utc));
         service.Verify(x => x.ProcessAsync(expected, CancellationToken.None), Times.Once);
@@ -64,21 +60,21 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
     }
 
     [Test]
-    public async Task Run_ForwardsCancellationToken()
+    public async Task HandleAsync_ForwardsCancellationToken()
     {
         using var source = new CancellationTokenSource();
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), false, DateTime.UtcNow, "");
         service.Setup(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token))
             .Returns(Task.CompletedTask);
 
-        await trigger.Run(message, source.Token);
+        await handler.HandleAsync(message, source.Token);
 
         service.Verify(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token), Times.Once);
         service.VerifyNoOtherCalls();
     }
 
     [Test]
-    public void Run_PropagatesProcessingException()
+    public void HandleAsync_PropagatesProcessingException()
     {
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), true, DateTime.UtcNow, "");
         var failure = new InvalidOperationException("Processing failed");
@@ -86,13 +82,13 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
             .ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            trigger.Run(message, CancellationToken.None));
+            handler.HandleAsync(message, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
 
     [Test]
-    public void Run_PropagatesCancellationException()
+    public void HandleAsync_PropagatesCancellationException()
     {
         using var source = new CancellationTokenSource();
         source.Cancel();
@@ -101,18 +97,6 @@ public class EmploymentCheckCompletedServiceBusTriggerTests
             .Returns(Task.FromCanceled(source.Token));
 
         Assert.ThrowsAsync<TaskCanceledException>(() =>
-            trigger.Run(message, source.Token));
-    }
-    [Test]
-    public void Run_UsesConfirmedConnectionAndExistingQueueBinding()
-    {
-        var binding = typeof(EmploymentCheckCompletedServiceBusTrigger).GetMethod("Run")!.GetParameters()
-            .Select(parameter => parameter.GetCustomAttribute<ServiceBusTriggerAttribute>())
-            .Single(attribute => attribute is not null)!;
-        Assert.Multiple(() =>
-        {
-            Assert.That(binding.Connection, Is.EqualTo("DasSharedServiceBusConnection"));
-            Assert.That(binding.QueueName, Is.EqualTo("%EmploymentCheckCompletedQueueName%"));
-        });
+            handler.HandleAsync(message, source.Token));
     }
 }

@@ -16,13 +16,13 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var serviceBusConnection = configuration["PaymentsServiceBusConnection"];
+        var serviceBusConnection = configuration["DasSharedServiceBusConnection"];
         if (string.IsNullOrWhiteSpace(serviceBusConnection))
         {
-            throw new InvalidOperationException("The PaymentsServiceBusConnection setting is required for employment verification publishing.");
+            throw new InvalidOperationException("The DasSharedServiceBusConnection setting is required for employment verification publishing.");
         }
 
-        var topicName = configuration["VerifyNotEmployedCompletedTopicName"];
+        var topicName = configuration["VerifyNotEmployedCompletedTopicName"] ?? configuration["DasSharedServiceBusTopicName"] ?? "bundle-1";
         if (string.IsNullOrWhiteSpace(topicName))
         {
             throw new InvalidOperationException("The VerifyNotEmployedCompletedTopicName setting is required for employment verification publishing.");
@@ -36,16 +36,7 @@ public static class ServiceCollectionExtensions
         if (provisioning.Enabled)
         {
             services.AddSingleton(provisioning);
-            services.AddSingleton<IReadOnlyDictionary<ServiceBusNamespace, ServiceBusAdministrationClient>>(_ =>
-                new Dictionary<ServiceBusNamespace, ServiceBusAdministrationClient>
-                {
-                    [ServiceBusNamespace.DasShared] = new ServiceBusAdministrationClient(
-                        configuration["DasSharedServiceBusAdministrationConnection"]
-                        ?? configuration["DasSharedServiceBusConnection"]),
-                    [ServiceBusNamespace.Payments] = new ServiceBusAdministrationClient(
-                        configuration["PaymentsServiceBusAdministrationConnection"]
-                        ?? configuration["PaymentsServiceBusConnection"])
-                });
+            services.AddSingleton(_ => new ServiceBusAdministrationClient(serviceBusConnection));
             services.AddHostedService<SetupMessagingInfrastructure>();
         }
 

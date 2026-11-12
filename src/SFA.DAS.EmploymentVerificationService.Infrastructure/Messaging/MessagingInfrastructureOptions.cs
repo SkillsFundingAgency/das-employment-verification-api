@@ -1,78 +1,38 @@
 using Microsoft.Extensions.Configuration;
+using SFA.DAS.EmploymentCheck.Types;
+using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 
 namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
-public enum ServiceBusNamespace
-{
-    DasShared,
-    Payments
-}
-
-public sealed class MessagingRoute
-{
-    public ServiceBusNamespace Namespace { get; set; }
-    public string RuleName { get; set; } = string.Empty;
-    public string TopicName { get; set; } = string.Empty;
-    public string SubscriptionName { get; set; } = string.Empty;
-    public string QueueName { get; set; } = string.Empty;
-    public string SqlFilter { get; set; } = string.Empty;
-}
-
 public sealed class MessagingInfrastructureOptions
 {
-    public MessagingInfrastructureOptions(bool enabled, IReadOnlyList<MessagingRoute> routes)
-    {
-        Enabled = enabled;
-        Routes = routes;
-    }
-
-    public bool Enabled { get; }
-    public IReadOnlyList<MessagingRoute> Routes { get; }
+    public bool Enabled { get; init; }
+    public string TopicName { get; init; } = "bundle-1";
+    public string QueueName { get; init; } = string.Empty;
+    public string SubscriptionName { get; init; } = string.Empty;
+    public const string RuleName = "EvsMessages";
+    // Broker prefilter: exact concrete-type identity is enforced by the consumer.
+    // These two CLR names contain no LIKE wildcard characters. Preserve the deployed SQL.
+    public static readonly string SqlFilter =
+        $"[{ServiceBusMessageHeaders.EnclosedMessageTypes}] LIKE '%{typeof(VerifyNotEmployed).FullName}%' OR " +
+        $"[{ServiceBusMessageHeaders.EnclosedMessageTypes}] LIKE '%{typeof(EmploymentCheckCompletedEvent).FullName}%'";
 
     public static MessagingInfrastructureOptions Read(IConfiguration configuration)
     {
-        if (!configuration.GetValue<bool>("ServiceBusSetupEnabled"))
-            return new(false, Array.Empty<MessagingRoute>());
-
-        if (!configuration.GetValue<bool>("ServiceBusFiltersReviewed"))
-            throw new InvalidOperationException("ServiceBusFiltersReviewed must be true before enabling messaging provisioning.");
-
-        var routes = EvsRoutes.For(configuration);
-
-        ValidateRoutes(routes);
-        return new(true, routes);
-    }
-
-    public static void ValidateRoutes(IReadOnlyList<MessagingRoute> routes)
-    {
-        var queues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var subscriptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var route in routes)
+        var enabled = configuration.GetValue<bool>("ServiceBusSetupEnabled");
+        var topic = configuration["DasSharedServiceBusTopicName"] ?? "bundle-1";
+        if (string.IsNullOrWhiteSpace(topic))
+            throw new InvalidOperationException("DasSharedServiceBusTopicName must not be empty.");
+        return new MessagingInfrastructureOptions
         {
-            if (!Enum.IsDefined(route.Namespace))
-                throw new InvalidOperationException("Each messaging route requires a valid Service Bus namespace.");
-            if (string.IsNullOrWhiteSpace(route.RuleName) || string.IsNullOrWhiteSpace(route.TopicName)
-                || string.IsNullOrWhiteSpace(route.SubscriptionName) || string.IsNullOrWhiteSpace(route.QueueName))
-                throw new InvalidOperationException("Each messaging route requires RuleName, TopicName, SubscriptionName and QueueName.");
-
-            if (route.RuleName.Equals("$Default", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Messaging routes must use a named SQL rule other than $Default.");
-
-            if (!queues.Add($"{route.Namespace}/{route.QueueName}") || !subscriptions.Add($"{route.Namespace}/{route.TopicName}/{route.SubscriptionName}"))
-                throw new InvalidOperationException("Messaging routes must use distinct queues and distinct topic/subscription pairs within each namespace.");
-        }
-
-        ValidateSqlFilters(routes);
+            Enabled = enabled,
+            TopicName = topic,
+            QueueName = enabled ? Required(configuration, "EvsQueueName") : string.Empty,
+            SubscriptionName = enabled ? Required(configuration, "EvsSubscriptionName") : string.Empty
+        };
     }
 
-    private static void ValidateSqlFilters(IReadOnlyList<MessagingRoute> routes)
-    {
-        foreach (var route in routes)
-        {
-            if (string.IsNullOrWhiteSpace(route.SqlFilter))
-                throw new InvalidOperationException(route.RuleName == "VerifyNotEmployed"
-                    ? "The VerifyNotEmployed SQL filter in EvsRoutes is unresolved. DataLocks publishing metadata must be confirmed before enabling ServiceBusSetupEnabled."
-                    : $"The SQL filter for messaging rule '{route.RuleName}' is required for messaging provisioning.");
-        }
-    }
+    private static string Required(IConfiguration configuration, string name) =>
+        !string.IsNullOrWhiteSpace(configuration[name]) ? configuration[name]! :
+            throw new InvalidOperationException($"The {name} setting is required for messaging provisioning.");
 }

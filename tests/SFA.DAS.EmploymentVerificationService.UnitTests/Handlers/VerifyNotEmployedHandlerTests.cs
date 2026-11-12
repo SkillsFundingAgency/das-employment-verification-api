@@ -1,31 +1,27 @@
-using System.Reflection;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
-using SFA.DAS.EmploymentVerificationService.Functions.Triggers;
+using SFA.DAS.EmploymentVerificationService.Functions.Handlers;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 
-namespace SFA.DAS.EmploymentVerificationService.UnitTests.Triggers;
+namespace SFA.DAS.EmploymentVerificationService.UnitTests.Handlers;
 
 [TestFixture]
-public class VerifyNotEmployedServiceBusTriggerTests
+public class VerifyNotEmployedHandlerTests
 {
     private Mock<IVerifyNotEmployedService> service = null!;
-    private VerifyNotEmployedServiceBusTrigger trigger = null!;
+    private VerifyNotEmployedHandler handler = null!;
 
     [SetUp]
     public void SetUp()
     {
         service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
-        trigger = new VerifyNotEmployedServiceBusTrigger(service.Object,
-            NullLogger<VerifyNotEmployedServiceBusTrigger>.Instance);
+        handler = new VerifyNotEmployedHandler(service.Object);
     }
 
     [TestCase(30, 789L, "reference")]
     [TestCase(null, null, null)]
-    public async Task Run_ForwardsOriginalCommandInstance(int? duration, long? apprenticeshipId, string? reference)
+    public async Task HandleAsync_ForwardsOriginalCommandInstance(int? duration, long? apprenticeshipId, string? reference)
     {
         var command = new VerifyNotEmployed
         {
@@ -41,7 +37,7 @@ public class VerifyNotEmployedServiceBusTriggerTests
             ReferenceEquals(received, command)), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
-        await trigger.Run(command, CancellationToken.None);
+        await handler.HandleAsync(command, CancellationToken.None);
 
         service.Verify(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(received =>
             ReferenceEquals(received, command)), CancellationToken.None), Times.Once);
@@ -49,39 +45,27 @@ public class VerifyNotEmployedServiceBusTriggerTests
     }
 
     [Test]
-    public async Task Run_PropagatesCancellationToken()
+    public async Task HandleAsync_PropagatesCancellationToken()
     {
         using var source = new CancellationTokenSource();
         var command = new VerifyNotEmployed();
         service.Setup(x => x.ProcessAsync(command, source.Token)).Returns(Task.CompletedTask);
 
-        await trigger.Run(command, source.Token);
+        await handler.HandleAsync(command, source.Token);
 
         service.Verify(x => x.ProcessAsync(command, source.Token), Times.Once);
     }
 
     [Test]
-    public void Run_PropagatesProcessingException()
+    public void HandleAsync_PropagatesProcessingException()
     {
         var command = new VerifyNotEmployed();
         var failure = new InvalidOperationException("Processing failed");
         service.Setup(x => x.ProcessAsync(command, CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            trigger.Run(command, CancellationToken.None));
+            handler.HandleAsync(command, CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
-    }
-    [Test]
-    public void Run_UsesConfirmedConnectionAndExistingQueueBinding()
-    {
-        var binding = typeof(VerifyNotEmployedServiceBusTrigger).GetMethod("Run")!.GetParameters()
-            .Select(parameter => parameter.GetCustomAttribute<ServiceBusTriggerAttribute>())
-            .Single(attribute => attribute is not null)!;
-        Assert.Multiple(() =>
-        {
-            Assert.That(binding.Connection, Is.EqualTo("PaymentsServiceBusConnection"));
-            Assert.That(binding.QueueName, Is.EqualTo("%VerifyNotEmployedQueueName%"));
-        });
     }
 }

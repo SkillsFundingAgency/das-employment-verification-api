@@ -8,12 +8,11 @@ using SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Messaging;
 
-[TestFixture(ServiceBusNamespace.Payments)]
-[TestFixture(ServiceBusNamespace.DasShared)]
-public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
+[TestFixture]
+public class ForwardToValidationTests
 {
     private const string QueueName = "sfa-das-evs-verify-not-employed";
-    private const string SqlFilter = "sys.Label = 'test-command'";
+    private static readonly string SqlFilter = MessagingInfrastructureOptions.SqlFilter;
     private Mock<ServiceBusAdministrationClient> client = null!;
     private SubscriptionProperties subscription = null!;
     private MessagingInfrastructureOptions options = null!;
@@ -37,7 +36,7 @@ public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
             .ReturnsAsync(() => Response.FromValue(subscription, Mock.Of<Response>()));
         var rules = new[]
         {
-            ServiceBusModelFactory.RuleProperties("VerifyNotEmployed", new SqlRuleFilter(SqlFilter), null),
+            ServiceBusModelFactory.RuleProperties(MessagingInfrastructureOptions.RuleName, new SqlRuleFilter(SqlFilter), null),
             ServiceBusModelFactory.RuleProperties("$Default", new TrueRuleFilter(), null)
         };
         client.Setup(x => x.GetRulesAsync("bundle-1", QueueName, CancellationToken.None))
@@ -45,19 +44,14 @@ public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
                 [Page<RuleProperties>.FromValues(rules, null, Mock.Of<Response>())]));
         client.Setup(x => x.DeleteRuleAsync("bundle-1", QueueName, "$Default", CancellationToken.None))
             .ReturnsAsync(Mock.Of<Response>());
-        options = new MessagingInfrastructureOptions(true,
-        [
-            new MessagingRoute
-            {
-                Namespace = serviceBusNamespace,
-                RuleName = "VerifyNotEmployed",
-                TopicName = "bundle-1",
-                SubscriptionName = QueueName,
-                QueueName = QueueName,
-                SqlFilter = SqlFilter
-            }
-        ]);
-        service = new SetupMessagingInfrastructure(new Dictionary<ServiceBusNamespace, ServiceBusAdministrationClient> { [serviceBusNamespace] = client.Object, [serviceBusNamespace == ServiceBusNamespace.Payments ? ServiceBusNamespace.DasShared : ServiceBusNamespace.Payments] = new Mock<ServiceBusAdministrationClient>(MockBehavior.Strict).Object }, options,
+        options = new MessagingInfrastructureOptions
+        {
+            Enabled = true,
+            TopicName = "bundle-1",
+            SubscriptionName = QueueName,
+            QueueName = QueueName
+        };
+        service = new SetupMessagingInfrastructure(client.Object, options,
             NullLogger<SetupMessagingInfrastructure>.Instance);
     }
 
@@ -87,17 +81,42 @@ public class ForwardToValidationTests(ServiceBusNamespace serviceBusNamespace)
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [TestCase("")]
-    [TestCase(" \t")]
-    public void StartAsync_WhenSqlFilterIsEmpty_RejectsEnabledProvisioningWithoutRemovingDefault(string sqlFilter)
+    [Test]
+    public async Task StartAsync_CreatesOneForwardingSubscriptionWithOnlyCombinedRule()
     {
-        options.Routes[0].SqlFilter = sqlFilter;
+        client.Setup(x => x.QueueExistsAsync(QueueName, CancellationToken.None))
+            .ReturnsAsync(Response.FromValue(false, Mock.Of<Response>()));
+        client.Setup(x => x.CreateQueueAsync(It.Is<CreateQueueOptions>(q => q.Name == QueueName), CancellationToken.None))
+            .ReturnsAsync(Response.FromValue<QueueProperties>(null!, Mock.Of<Response>()));
+        client.Setup(x => x.SubscriptionExistsAsync("bundle-1", QueueName, CancellationToken.None))
+            .ReturnsAsync(Response.FromValue(false, Mock.Of<Response>()));
+        client.Setup(x => x.CreateSubscriptionAsync(
+                It.Is<CreateSubscriptionOptions>(o => o.TopicName == "bundle-1" && o.SubscriptionName == QueueName && o.ForwardTo == QueueName),
+                It.Is<CreateRuleOptions>(r => r.Name == MessagingInfrastructureOptions.RuleName &&
+                    r.Filter is SqlRuleFilter && ((SqlRuleFilter)r.Filter).SqlExpression == SqlFilter), CancellationToken.None))
+            .ReturnsAsync(Response.FromValue(subscription, Mock.Of<Response>())).Verifiable();
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None));
+        await service.StartAsync(CancellationToken.None);
 
-        Assert.That(exception!.Message, Does.Contain("SQL filter"));
-        client.Verify(x => x.DeleteRuleAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+        client.Verify();
+        client.Verify(x => x.GetRulesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [TestCase("missing")]
+    [TestCase("wrong-filter")]
+    [TestCase("unexpected")]
+    public void StartAsync_RejectsIncompatibleExistingRulesWithoutDeletingResources(string problem)
+    {
+        var rules = problem switch
+        {
+            "missing" => Array.Empty<RuleProperties>(),
+            "wrong-filter" => new[] { ServiceBusModelFactory.RuleProperties(MessagingInfrastructureOptions.RuleName, new TrueRuleFilter(), null) },
+            _ => new[] { ServiceBusModelFactory.RuleProperties("unexpected", new TrueRuleFilter(), null) }
+        };
+        client.Setup(x => x.GetRulesAsync("bundle-1", QueueName, CancellationToken.None))
+            .Returns(AsyncPageable<RuleProperties>.FromPages(
+                [Page<RuleProperties>.FromValues(rules, null, Mock.Of<Response>())]));
+        Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None));
+        client.Verify(x => x.DeleteRuleAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

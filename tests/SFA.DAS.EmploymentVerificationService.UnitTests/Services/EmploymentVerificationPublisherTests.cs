@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using SFA.DAS.EmploymentVerificationService.Infrastructure.Extensions;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Moq;
@@ -18,6 +21,25 @@ public class EmploymentVerificationPublisherTests
     {
         sender = new Mock<ServiceBusSender>();
         publisher = new EmploymentVerificationPublisher(sender.Object);
+    }
+
+    [TestCase(null, "bundle-1")]
+    [TestCase("completion-topic", "completion-topic")]
+    public async Task PublisherDestination_UsesDasSharedAndConfiguredTopic(string? outgoingTopic, string expectedTopic)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DasSharedServiceBusConnection"] = "Endpoint=sb://das-shared.servicebus.windows.net/;SharedAccessKeyName=test;SharedAccessKey=dGVzdA==",
+            ["DasSharedServiceBusTopicName"] = "bundle-1",
+            ["VerifyNotEmployedCompletedTopicName"] = outgoingTopic
+        }).Build();
+        await using var provider = new ServiceCollection().AddInfrastructure(configuration).BuildServiceProvider();
+        var destination = provider.GetRequiredService<ServiceBusSender>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(destination.FullyQualifiedNamespace, Is.EqualTo("das-shared.servicebus.windows.net"));
+            Assert.That(destination.EntityPath, Is.EqualTo(expectedTopic));
+        });
     }
 
     [TestCase(null, true)]
