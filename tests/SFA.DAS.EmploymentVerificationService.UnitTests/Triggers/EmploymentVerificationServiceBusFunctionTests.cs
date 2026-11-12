@@ -177,7 +177,7 @@ public class EmploymentVerificationServiceBusFunctionTests
             .Callback(() => active = scopes.ActiveScopeValues())
             .Returns(Task.CompletedTask);
         var message = ServiceBusModelFactory.ServiceBusReceivedMessage(BinaryData.FromString("{}"),
-            messageId: "message-1", deliveryCount: 3,
+            messageId: "message-1", deliveryCount: 3, correlationId: "correlation-1",
             properties: new Dictionary<string, object> { [ServiceBusMessageHeaders.EnclosedMessageTypes] = typeof(VerifyNotEmployed).FullName! });
 
         await function.Run(message, CancellationToken.None);
@@ -187,6 +187,7 @@ public class EmploymentVerificationServiceBusFunctionTests
             Assert.That(active, Is.Not.Null);
             Assert.That(active!["MessageId"], Is.EqualTo("message-1"));
             Assert.That(active["DeliveryCount"], Is.EqualTo(3));
+            Assert.That(active["CorrelationId"], Is.EqualTo("correlation-1"));
             Assert.That(scopes.ActiveScopeValues(), Is.Empty, "Scope must end when processing ends.");
         });
     }
@@ -200,6 +201,36 @@ public class EmploymentVerificationServiceBusFunctionTests
         Assert.ThrowsAsync<InvalidOperationException>(() =>
             function.Run(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None));
         Assert.That(scopes.ActiveScopeValues(), Is.Empty);
+    }
+
+    [Test]
+    public async Task Factory_ResolvesHandlerFromEachScope()
+    {
+        var resolvedHandlers = new List<Mock<IMessageHandler<VerifyNotEmployed>>>();
+        using var scopedProvider = new ServiceCollection()
+            .AddLogging()
+            .AddScoped<IMessageHandlerFactory, MessageHandlerFactory>()
+            .AddScoped<IMessageHandler<VerifyNotEmployed>>(_ =>
+            {
+                var handler = new Mock<IMessageHandler<VerifyNotEmployed>>(MockBehavior.Strict);
+                handler.Setup(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
+                    .Returns(Task.CompletedTask);
+                resolvedHandlers.Add(handler);
+                return handler.Object;
+            })
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+
+        for (var i = 0; i < 2; i++)
+        {
+            using var messageScope = scopedProvider.CreateScope();
+            var scopedFactory = messageScope.ServiceProvider.GetRequiredService<IMessageHandlerFactory>();
+            await scopedFactory.HandleAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
+            await scopedFactory.HandleAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
+        }
+
+        Assert.That(resolvedHandlers, Has.Count.EqualTo(2));
+        foreach (var handler in resolvedHandlers)
+            handler.Verify(x => x.HandleAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Exactly(2));
     }
 
     [Test]

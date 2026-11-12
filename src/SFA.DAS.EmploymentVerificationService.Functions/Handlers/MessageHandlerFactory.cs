@@ -15,15 +15,13 @@ public sealed class MessageHandlerFactory : IMessageHandlerFactory
 
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger<MessageHandlerFactory> logger;
-    private readonly IReadOnlyDictionary<string, Func<BinaryData, CancellationToken, Task>> handlers;
+    private readonly Dictionary<string, Func<BinaryData, CancellationToken, Task>> handlers;
 
-    public MessageHandlerFactory(
-        IServiceProvider serviceProvider,
-        ILogger<MessageHandlerFactory> logger)
+    public MessageHandlerFactory(IServiceProvider serviceProvider, ILogger<MessageHandlerFactory> logger)
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
-        handlers = new Dictionary<string, Func<BinaryData, CancellationToken, Task>>(StringComparer.Ordinal)
+        handlers = new(StringComparer.Ordinal)
         {
             [typeof(VerifyNotEmployed).FullName!] = HandleAsync<VerifyNotEmployed>,
             [typeof(EmploymentCheckCompletedEvent).FullName!] = HandleAsync<EmploymentCheckCompletedEvent>
@@ -39,7 +37,8 @@ public sealed class MessageHandlerFactory : IMessageHandlerFactory
         using var scope = logger.BeginScope(new Dictionary<string, object>
         {
             ["MessageId"] = message.MessageId,
-            ["DeliveryCount"] = message.DeliveryCount
+            ["DeliveryCount"] = message.DeliveryCount,
+            ["CorrelationId"] = message.CorrelationId
         });
 
         if (!message.ApplicationProperties.TryGetValue(
@@ -84,10 +83,10 @@ public sealed class MessageHandlerFactory : IMessageHandlerFactory
         var handler =
             serviceProvider.GetRequiredService<IMessageHandler<TMessage>>();
 
-        var command = JsonSerializer.Deserialize<TMessage>(
+        var message = JsonSerializer.Deserialize<TMessage>(
             body.ToMemory().Span, JsonOptions)
             ?? throw new JsonException("Invalid message body.");
 
-        return handler.HandleAsync(command, cancellationToken);
+        return handler.HandleAsync(message, cancellationToken);
     }
 }
