@@ -1,27 +1,27 @@
 using Moq;
 using NUnit.Framework;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
-using SFA.DAS.EmploymentVerificationService.Functions.Handlers;
+using SFA.DAS.EmploymentVerificationService.Functions.Processors;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 
-namespace SFA.DAS.EmploymentVerificationService.UnitTests.Handlers;
+namespace SFA.DAS.EmploymentVerificationService.UnitTests.Processors;
 
 [TestFixture]
-public class VerifyNotEmployedHandlerTests
+public class VerifyNotEmployedProcessorTests
 {
     private Mock<IVerifyNotEmployedService> service = null!;
-    private VerifyNotEmployedHandler handler = null!;
+    private VerifyNotEmployedProcessor processor = null!;
 
     [SetUp]
     public void SetUp()
     {
         service = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
-        handler = new VerifyNotEmployedHandler(service.Object);
+        processor = new VerifyNotEmployedProcessor(service.Object);
     }
 
     [TestCase(30, 789L, "reference")]
     [TestCase(null, null, null)]
-    public async Task HandleAsync_ForwardsDeserializedCommandValues(int? duration, long? apprenticeshipId, string? reference)
+    public async Task ProcessAsync_ForwardsDeserializedCommandValues(int? duration, long? apprenticeshipId, string? reference)
     {
         var command = new VerifyNotEmployed
         {
@@ -40,7 +40,7 @@ public class VerifyNotEmployedHandlerTests
             received.DurationInDays == command.DurationInDays && received.Reference == command.Reference), CancellationToken.None))
             .Returns(Task.CompletedTask);
 
-        await handler.HandleAsync(BinaryData.FromObjectAsJson(command), CancellationToken.None);
+        await processor.ProcessAsync(BinaryData.FromObjectAsJson(command), CancellationToken.None);
 
         service.Verify(x => x.ProcessAsync(It.Is<VerifyNotEmployed>(received =>
             received.CorrelationId == command.CorrelationId && received.ULN == command.ULN &&
@@ -51,26 +51,26 @@ public class VerifyNotEmployedHandlerTests
     }
 
     [Test]
-    public async Task HandleAsync_PropagatesCancellationToken()
+    public async Task ProcessAsync_PropagatesCancellationToken()
     {
         using var source = new CancellationTokenSource();
         var command = new VerifyNotEmployed();
         service.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), source.Token)).Returns(Task.CompletedTask);
 
-        await handler.HandleAsync(BinaryData.FromObjectAsJson(command), source.Token);
+        await processor.ProcessAsync(BinaryData.FromObjectAsJson(command), source.Token);
 
         service.Verify(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), source.Token), Times.Once);
     }
 
     [Test]
-    public void HandleAsync_PropagatesProcessingException()
+    public void ProcessAsync_PropagatesProcessingException()
     {
         var command = new VerifyNotEmployed();
         var failure = new InvalidOperationException("Processing failed");
         service.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.HandleAsync(BinaryData.FromObjectAsJson(command), CancellationToken.None));
+            processor.ProcessAsync(BinaryData.FromObjectAsJson(command), CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }

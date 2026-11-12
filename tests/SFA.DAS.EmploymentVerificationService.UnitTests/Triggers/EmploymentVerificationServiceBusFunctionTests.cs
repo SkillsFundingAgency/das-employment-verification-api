@@ -11,7 +11,7 @@ using SFA.DAS.EmploymentCheck.Types;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
-using SFA.DAS.EmploymentVerificationService.Functions.Handlers;
+using SFA.DAS.EmploymentVerificationService.Functions.Processors;
 using SFA.DAS.EmploymentVerificationService.Functions.Triggers;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
 
@@ -23,7 +23,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     private Mock<IEmploymentCheckCompletionService> completion = null!;
     private ServiceProvider provider = null!;
     private IServiceScope scope = null!;
-    private IMessageHandlerFactory factory = null!;
+    private IMessageProcessorFactory factory = null!;
     private EmploymentVerificationServiceBusFunction function = null!;
     private ScopeCapturingLoggerProvider scopes = null!;
 
@@ -36,12 +36,12 @@ public class EmploymentVerificationServiceBusFunctionTests
         provider = new ServiceCollection().AddLogging(logging => logging.AddProvider(scopes))
             .AddScoped<IVerifyNotEmployedService>(_ => command.Object)
             .AddScoped<IEmploymentCheckCompletionService>(_ => completion.Object)
-            .AddScoped<VerifyNotEmployedHandler>()
-            .AddScoped<EmploymentCheckCompletedEventHandler>()
-            .AddScoped<IMessageHandlerFactory, MessageHandlerFactory>()
+            .AddScoped<VerifyNotEmployedProcessor>()
+            .AddScoped<EmploymentCheckCompletedEventProcessor>()
+            .AddScoped<IMessageProcessorFactory, MessageProcessorFactory>()
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         scope = provider.CreateScope();
-        factory = scope.ServiceProvider.GetRequiredService<IMessageHandlerFactory>();
+        factory = scope.ServiceProvider.GetRequiredService<IMessageProcessorFactory>();
         function = new EmploymentVerificationServiceBusFunction(factory);
     }
 
@@ -105,14 +105,14 @@ public class EmploymentVerificationServiceBusFunctionTests
 
     [Test]
     public void Factory_RejectsAmbiguousSupportedTypes() =>
-        Assert.ThrowsAsync<InvalidOperationException>(() => factory.HandleAsync(Message(
+        Assert.ThrowsAsync<InvalidOperationException>(() => factory.ProcessAsync(Message(
             $"{typeof(VerifyNotEmployed).AssemblyQualifiedName};{typeof(EmploymentCheckCompletedEvent).FullName}"), CancellationToken.None));
 
     [Test]
     public async Task Factory_AcceptsRepeatedSameConcreteType()
     {
         command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).Returns(Task.CompletedTask);
-        await factory.HandleAsync(Message($"{typeof(VerifyNotEmployed).FullName};{typeof(VerifyNotEmployed).AssemblyQualifiedName}"), CancellationToken.None);
+        await factory.ProcessAsync(Message($"{typeof(VerifyNotEmployed).FullName};{typeof(VerifyNotEmployed).AssemblyQualifiedName}"), CancellationToken.None);
         command.Verify(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Once);
     }
 
@@ -139,7 +139,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     }
 
     [Test]
-    public void Run_PropagatesHandlerCancellation()
+    public void Run_PropagatesProcessorCancellation()
     {
         using var cancellation = new CancellationTokenSource();
         command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), cancellation.Token))
@@ -148,7 +148,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     }
 
     [Test]
-    public void Run_PropagatesHandlerFailure()
+    public void Run_PropagatesProcessorFailure()
     {
         var failure = new InvalidOperationException("failed");
         command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).ThrowsAsync(failure);
@@ -157,7 +157,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     }
 
     [Test]
-    public async Task Run_AwaitsHandler()
+    public async Task Run_AwaitsProcessor()
     {
         var pending = new TaskCompletionSource();
         command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None)).Returns(pending.Task);
@@ -178,7 +178,7 @@ public class EmploymentVerificationServiceBusFunctionTests
     }
 
     [Test]
-    public async Task Run_InvokesHandlerWithinMessageLoggingScope()
+    public async Task Run_InvokesProcessorWithinMessageLoggingScope()
     {
         IReadOnlyDictionary<string, object?>? active = null;
         command.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
@@ -212,41 +212,41 @@ public class EmploymentVerificationServiceBusFunctionTests
     }
 
     [Test]
-    public async Task Factory_ResolvesHandlerFromEachScope()
+    public async Task Factory_ResolvesProcessorFromEachScope()
     {
         var resolvedServices = new List<Mock<IVerifyNotEmployedService>>();
-        var resolvedHandlers = new List<VerifyNotEmployedHandler>();
+        var resolvedProcessors = new List<VerifyNotEmployedProcessor>();
         using var scopedProvider = new ServiceCollection()
             .AddLogging()
-            .AddScoped<VerifyNotEmployedHandler>()
-            .AddScoped<EmploymentCheckCompletedEventHandler>()
-            .AddScoped<IMessageHandlerFactory, MessageHandlerFactory>()
+            .AddScoped<VerifyNotEmployedProcessor>()
+            .AddScoped<EmploymentCheckCompletedEventProcessor>()
+            .AddScoped<IMessageProcessorFactory, MessageProcessorFactory>()
             .AddScoped<IVerifyNotEmployedService>(_ =>
             {
-                var handler = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
-                handler.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
+                var processor = new Mock<IVerifyNotEmployedService>(MockBehavior.Strict);
+                processor.Setup(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None))
                     .Returns(Task.CompletedTask);
-                resolvedServices.Add(handler);
-                return handler.Object;
+                resolvedServices.Add(processor);
+                return processor.Object;
             })
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
 
         for (var i = 0; i < 2; i++)
         {
             using var messageScope = scopedProvider.CreateScope();
-            var scopedFactory = messageScope.ServiceProvider.GetRequiredService<IMessageHandlerFactory>();
-            var scopedHandler = messageScope.ServiceProvider.GetRequiredService<VerifyNotEmployedHandler>();
-            resolvedHandlers.Add(scopedHandler);
-            Assert.That(messageScope.ServiceProvider.GetRequiredService<VerifyNotEmployedHandler>(), Is.SameAs(scopedHandler));
-            await scopedFactory.HandleAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
-            await scopedFactory.HandleAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
+            var scopedFactory = messageScope.ServiceProvider.GetRequiredService<IMessageProcessorFactory>();
+            var scopedProcessor = messageScope.ServiceProvider.GetRequiredService<VerifyNotEmployedProcessor>();
+            resolvedProcessors.Add(scopedProcessor);
+            Assert.That(messageScope.ServiceProvider.GetRequiredService<VerifyNotEmployedProcessor>(), Is.SameAs(scopedProcessor));
+            await scopedFactory.ProcessAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
+            await scopedFactory.ProcessAsync(Message(typeof(VerifyNotEmployed).FullName), CancellationToken.None);
         }
 
-        Assert.That(resolvedHandlers, Has.Count.EqualTo(2));
-        Assert.That(resolvedHandlers[0], Is.Not.SameAs(resolvedHandlers[1]));
+        Assert.That(resolvedProcessors, Has.Count.EqualTo(2));
+        Assert.That(resolvedProcessors[0], Is.Not.SameAs(resolvedProcessors[1]));
         Assert.That(resolvedServices, Has.Count.EqualTo(2));
-        foreach (var handler in resolvedServices)
-            handler.Verify(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Exactly(2));
+        foreach (var processor in resolvedServices)
+            processor.Verify(x => x.ProcessAsync(It.IsAny<VerifyNotEmployed>(), CancellationToken.None), Times.Exactly(2));
     }
 
     [Test]

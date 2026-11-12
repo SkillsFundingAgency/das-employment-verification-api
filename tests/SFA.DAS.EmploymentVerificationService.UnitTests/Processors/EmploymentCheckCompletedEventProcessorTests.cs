@@ -3,28 +3,28 @@ using NUnit.Framework;
 using SFA.DAS.EmploymentCheck.Types;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
-using SFA.DAS.EmploymentVerificationService.Functions.Handlers;
+using SFA.DAS.EmploymentVerificationService.Functions.Processors;
 
-namespace SFA.DAS.EmploymentVerificationService.UnitTests.Handlers;
+namespace SFA.DAS.EmploymentVerificationService.UnitTests.Processors;
 
 [TestFixture]
-public class EmploymentCheckCompletedEventHandlerTests
+public class EmploymentCheckCompletedEventProcessorTests
 {
     private Mock<IEmploymentCheckCompletionService> service = null!;
-    private EmploymentCheckCompletedEventHandler handler = null!;
+    private EmploymentCheckCompletedEventProcessor processor = null!;
 
     [SetUp]
     public void SetUp()
     {
         service = new Mock<IEmploymentCheckCompletionService>(MockBehavior.Strict);
-        handler = new EmploymentCheckCompletedEventHandler(service.Object);
+        processor = new EmploymentCheckCompletedEventProcessor(service.Object);
     }
 
     [TestCase("true", "", false)]
     [TestCase("false", "", false)]
     [TestCase("null", "CheckFailed", false)]
     [TestCase("null", "CheckFailed", true)]
-    public async Task HandleAsync_MapsDeserializedEvent(
+    public async Task ProcessAsync_MapsDeserializedEvent(
         string resultJson, string errorType, bool camelCase)
     {
         var correlationId = Guid.NewGuid();
@@ -44,7 +44,7 @@ public class EmploymentCheckCompletedEventHandlerTests
         var expected = new EmploymentCheckResult(correlationId, employmentResult, checkDate, errorType);
         service.Setup(x => x.ProcessAsync(expected, CancellationToken.None)).Returns(Task.CompletedTask);
 
-        await handler.HandleAsync(new BinaryData(json), CancellationToken.None);
+        await processor.ProcessAsync(new BinaryData(json), CancellationToken.None);
 
         service.Verify(x => x.ProcessAsync(It.Is<EmploymentCheckResult>(result =>
             result.CheckDate.Kind == DateTimeKind.Utc), CancellationToken.None), Times.Once);
@@ -53,21 +53,21 @@ public class EmploymentCheckCompletedEventHandlerTests
     }
 
     [Test]
-    public async Task HandleAsync_ForwardsCancellationToken()
+    public async Task ProcessAsync_ForwardsCancellationToken()
     {
         using var source = new CancellationTokenSource();
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), false, DateTime.UtcNow, "");
         service.Setup(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token))
             .Returns(Task.CompletedTask);
 
-        await handler.HandleAsync(BinaryData.FromObjectAsJson(message), source.Token);
+        await processor.ProcessAsync(BinaryData.FromObjectAsJson(message), source.Token);
 
         service.Verify(x => x.ProcessAsync(It.IsAny<EmploymentCheckResult>(), source.Token), Times.Once);
         service.VerifyNoOtherCalls();
     }
 
     [Test]
-    public void HandleAsync_PropagatesProcessingException()
+    public void ProcessAsync_PropagatesProcessingException()
     {
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), true, DateTime.UtcNow, "");
         var failure = new InvalidOperationException("Processing failed");
@@ -75,13 +75,13 @@ public class EmploymentCheckCompletedEventHandlerTests
             .ThrowsAsync(failure);
 
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.HandleAsync(BinaryData.FromObjectAsJson(message), CancellationToken.None));
+            processor.ProcessAsync(BinaryData.FromObjectAsJson(message), CancellationToken.None));
 
         Assert.That(thrown, Is.SameAs(failure));
     }
 
     [Test]
-    public void HandleAsync_PropagatesCancellationException()
+    public void ProcessAsync_PropagatesCancellationException()
     {
         using var source = new CancellationTokenSource();
         var message = new EmploymentCheckCompletedEvent(Guid.NewGuid(), true, DateTime.UtcNow, "");
@@ -89,6 +89,6 @@ public class EmploymentCheckCompletedEventHandlerTests
             .Callback(() => source.Cancel()).Returns(() => Task.FromCanceled(source.Token));
 
         Assert.ThrowsAsync<TaskCanceledException>(() =>
-            handler.HandleAsync(BinaryData.FromObjectAsJson(message), source.Token));
+            processor.ProcessAsync(BinaryData.FromObjectAsJson(message), source.Token));
     }
 }

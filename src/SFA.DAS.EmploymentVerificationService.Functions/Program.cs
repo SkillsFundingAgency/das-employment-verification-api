@@ -1,5 +1,5 @@
 using SFA.DAS.EmploymentVerificationService.Functions.Extensions;
-using SFA.DAS.EmploymentVerificationService.Functions.Handlers;
+using SFA.DAS.EmploymentVerificationService.Functions.Processors;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,9 +11,9 @@ using SFA.DAS.EmploymentVerificationService.Infrastructure.Extensions;
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
-builder.Services.AddScoped<VerifyNotEmployedHandler>();
-builder.Services.AddScoped<EmploymentCheckCompletedEventHandler>();
-builder.Services.AddScoped<IMessageHandlerFactory, MessageHandlerFactory>();
+builder.Services.AddScoped<VerifyNotEmployedProcessor>();
+builder.Services.AddScoped<EmploymentCheckCompletedEventProcessor>();
+builder.Services.AddScoped<IMessageProcessorFactory, MessageProcessorFactory>();
 builder.Services.AddData(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplicationInsightsTelemetryWorkerService();
