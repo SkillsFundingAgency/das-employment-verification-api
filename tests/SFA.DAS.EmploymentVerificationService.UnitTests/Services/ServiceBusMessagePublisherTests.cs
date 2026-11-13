@@ -91,17 +91,21 @@ public class ServiceBusMessagePublisherTests
         Assert.That(root.GetProperty("ApprenticeshipId").Deserialize<long?>(), Is.EqualTo(apprenticeshipId));
     }
 
-    [Test]
-    public async Task PublishAsync_SupportsAnotherMessageType()
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task PublishAsync_SupportsAnotherMessageType_WithOptionalHeader(bool includeEnclosedMessageTypes)
     {
+        // Arrange
         var message = new TestMessage("Example");
         ServiceBusMessage? sent = null;
         sender.Setup(x => x.SendMessageAsync(It.IsAny<ServiceBusMessage>(), CancellationToken.None))
             .Callback<ServiceBusMessage, CancellationToken>((value, _) => sent = value)
             .Returns(Task.CompletedTask);
 
-        await publisher.PublishAsync(message, CancellationToken.None);
+        // Act
+        await publisher.PublishAsync(message, CancellationToken.None, includeEnclosedMessageTypes);
 
+        // Assert
         Assert.That(sent, Is.Not.Null);
         Assert.Multiple(() =>
         {
@@ -109,8 +113,15 @@ public class ServiceBusMessagePublisherTests
             Assert.That(sent.ContentType, Is.EqualTo("application/json"));
             Assert.That(sent.Subject, Is.Null);
             Assert.That(sent.CorrelationId, Is.Null);
-            Assert.That(sent.ApplicationProperties["NServiceBus.EnclosedMessageTypes"],
-                Is.EqualTo(typeof(TestMessage).AssemblyQualifiedName));
+            if (includeEnclosedMessageTypes)
+            {
+                Assert.That(sent.ApplicationProperties["NServiceBus.EnclosedMessageTypes"],
+                    Is.EqualTo(typeof(TestMessage).AssemblyQualifiedName));
+            }
+            else
+            {
+                Assert.That(sent.ApplicationProperties, Is.Empty);
+            }
         });
     }
 

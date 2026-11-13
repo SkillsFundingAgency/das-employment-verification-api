@@ -48,7 +48,7 @@ public class EmploymentCheckCompletionServiceTests
             message.ULN == request.ULN &&
             message.ApprenticeshipId == request.ApprenticeshipId &&
             message.EmployerAccountIdentifier == request.EmployerAccountIdentifier &&
-            message.NotEmployed == notEmployed), CancellationToken.None)).Returns(Task.CompletedTask);
+            message.NotEmployed == notEmployed), CancellationToken.None, true)).Returns(Task.CompletedTask);
 
         // Act
         await service.ProcessAsync(result, CancellationToken.None);
@@ -67,7 +67,7 @@ public class EmploymentCheckCompletionServiceTests
         repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None))
             .Callback<EmploymentCheckCompletion, CancellationToken>((completion, _) => recorded = completion)
             .Returns(Task.CompletedTask);
-        publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None)).Returns(Task.CompletedTask);
+        publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None, true)).Returns(Task.CompletedTask);
 
         // Act
         await service.ProcessAsync(result, CancellationToken.None);
@@ -105,7 +105,7 @@ public class EmploymentCheckCompletionServiceTests
         var saved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(request);
         repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), CancellationToken.None)).Returns(saved.Task);
-        publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None)).Returns(Task.CompletedTask);
+        publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None, true)).Returns(Task.CompletedTask);
 
         // Act
         var processing = service.ProcessAsync(result, CancellationToken.None);
@@ -115,7 +115,7 @@ public class EmploymentCheckCompletionServiceTests
         saved.SetResult();
         await processing;
 
-        publisher.Verify(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None), Times.Once);
+        publisher.Verify(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), CancellationToken.None, true), Times.Once);
     }
 
     [Test]
@@ -141,7 +141,7 @@ public class EmploymentCheckCompletionServiceTests
         var token = source.Token;
         repository.Setup(x => x.GetRequestAsync(result.CorrelationId, token)).ReturnsAsync(request);
         repository.Setup(x => x.RecordCompletionAsync(It.IsAny<EmploymentCheckCompletion>(), token)).Returns(Task.CompletedTask);
-        publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), token)).Returns(Task.CompletedTask);
+        publisher.Setup(x => x.PublishAsync(It.IsAny<VerifyNotEmployedCompleted>(), token, true)).Returns(Task.CompletedTask);
 
         // Act
         await service.ProcessAsync(result, token);

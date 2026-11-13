@@ -7,7 +7,7 @@ namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Services;
 
 public sealed class ServiceBusMessagePublisher(ServiceBusSender sender) : IMessagePublisher
 {
-    public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken)
+    public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken, bool includeEnclosedMessageTypes = true)
         where TMessage : class
     {
         var serviceBusMessage = new ServiceBusMessage(JsonSerializer.Serialize(message))
@@ -15,8 +15,11 @@ public sealed class ServiceBusMessagePublisher(ServiceBusSender sender) : IMessa
             ContentType = "application/json"
         };
 
-        serviceBusMessage.ApplicationProperties[ServiceBusMessageHeaders.EnclosedMessageTypes] =
-            typeof(TMessage).AssemblyQualifiedName!;
+        if (includeEnclosedMessageTypes)
+        {
+            serviceBusMessage.ApplicationProperties[ServiceBusMessageHeaders.EnclosedMessageTypes] =
+                typeof(TMessage).AssemblyQualifiedName!;
+        }
 
         return sender.SendMessageAsync(serviceBusMessage, cancellationToken);
     }
