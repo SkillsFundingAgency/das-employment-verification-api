@@ -30,7 +30,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton(_ => new ServiceBusClient(serviceBusConnection));
         services.AddSingleton(provider => provider.GetRequiredService<ServiceBusClient>().CreateSender(topicName));
-        services.AddScoped<IEmploymentVerificationPublisher, EmploymentVerificationPublisher>();
+        services.AddScoped<IMessagePublisher, ServiceBusMessagePublisher>();
 
         var provisioning = MessagingInfrastructureOptions.Read(configuration);
         if (provisioning.Enabled)

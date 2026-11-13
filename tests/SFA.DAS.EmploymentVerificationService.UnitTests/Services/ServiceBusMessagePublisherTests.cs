@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Extensions;
+using SFA.DAS.EmploymentVerificationService.Application.Services;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Moq;
@@ -11,16 +12,16 @@ using SFA.DAS.EmploymentVerificationService.Messages.Learner.Events;
 namespace SFA.DAS.EmploymentVerificationService.UnitTests.Services;
 
 [TestFixture]
-public class EmploymentVerificationPublisherTests
+public class ServiceBusMessagePublisherTests
 {
     private Mock<ServiceBusSender> sender = null!;
-    private EmploymentVerificationPublisher publisher = null!;
+    private ServiceBusMessagePublisher publisher = null!;
 
     [SetUp]
     public void SetUp()
     {
         sender = new Mock<ServiceBusSender>();
-        publisher = new EmploymentVerificationPublisher(sender.Object);
+        publisher = new ServiceBusMessagePublisher(sender.Object);
     }
 
     [TestCase(null, "bundle-1")]
@@ -38,6 +39,8 @@ public class EmploymentVerificationPublisherTests
 
         // Act
         var destination = provider.GetRequiredService<ServiceBusSender>();
+        using var scope = provider.CreateScope();
+        Assert.That(scope.ServiceProvider.GetRequiredService<IMessagePublisher>(), Is.TypeOf<ServiceBusMessagePublisher>());
 
         // Assert
         Assert.Multiple(() =>
@@ -73,8 +76,8 @@ public class EmploymentVerificationPublisherTests
         sender.Verify(x => x.SendMessageAsync(It.IsAny<ServiceBusMessage>(), cancellation.Token), Times.Once);
         Assert.That(sent, Is.Not.Null);
         Assert.That(sent!.ContentType, Is.EqualTo("application/json"));
-        Assert.That(sent.Subject, Is.EqualTo("VerifyNotEmployedCompleted"));
-        Assert.That(sent.CorrelationId, Is.EqualTo(message.CorrelationId.ToString()));
+        Assert.That(sent.Subject, Is.Null);
+        Assert.That(sent.CorrelationId, Is.Null);
         Assert.That(sent.ApplicationProperties, Has.Count.EqualTo(1));
         Assert.That(sent.ApplicationProperties["NServiceBus.EnclosedMessageTypes"],
             Is.EqualTo(typeof(VerifyNotEmployedCompleted).AssemblyQualifiedName));
@@ -87,6 +90,31 @@ public class EmploymentVerificationPublisherTests
         Assert.That(root.GetProperty("NotEmployed").GetBoolean(), Is.EqualTo(notEmployed));
         Assert.That(root.GetProperty("ApprenticeshipId").Deserialize<long?>(), Is.EqualTo(apprenticeshipId));
     }
+
+    [Test]
+    public async Task PublishAsync_SupportsAnotherMessageType()
+    {
+        var message = new TestMessage("Example");
+        ServiceBusMessage? sent = null;
+        sender.Setup(x => x.SendMessageAsync(It.IsAny<ServiceBusMessage>(), CancellationToken.None))
+            .Callback<ServiceBusMessage, CancellationToken>((value, _) => sent = value)
+            .Returns(Task.CompletedTask);
+
+        await publisher.PublishAsync(message, CancellationToken.None);
+
+        Assert.That(sent, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(sent!.Body.ToString(), Is.EqualTo(JsonSerializer.Serialize(message)));
+            Assert.That(sent.ContentType, Is.EqualTo("application/json"));
+            Assert.That(sent.Subject, Is.Null);
+            Assert.That(sent.CorrelationId, Is.Null);
+            Assert.That(sent.ApplicationProperties["NServiceBus.EnclosedMessageTypes"],
+                Is.EqualTo(typeof(TestMessage).AssemblyQualifiedName));
+        });
+    }
+
+    private sealed record TestMessage(string Value);
 
     [Test]
     public void PublishAsync_PropagatesSendException()

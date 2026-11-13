@@ -63,7 +63,7 @@ public sealed class TestSession
         var client = new EmploymentCheckClient(httpClient, settings,
             Mock.Of<IHostEnvironment>(environment => environment.EnvironmentName == Environments.Development),
             NullLogger<EmploymentCheckClient>.Instance, new DefaultAzureCredential());
-        var publisher = new EmploymentVerificationPublisher(sender.Object);
+        var publisher = new ServiceBusMessagePublisher(sender.Object);
         VerifyNotEmployedService = new VerifyNotEmployedService(repository, requestFactory, client,
             NullLogger<VerifyNotEmployedService>.Instance);
         EmploymentCheckCompletionService = new EmploymentCheckCompletionService(repository, publisher,

@@ -13,7 +13,7 @@ public class EmploymentCheckCompletionServiceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 29, 12, 34, 56, TimeSpan.Zero);
     private Mock<IEmploymentCheckRepository> repository = null!;
-    private Mock<IEmploymentVerificationPublisher> publisher = null!;
+    private Mock<IMessagePublisher> publisher = null!;
     private EmploymentCheckCompletionService service = null!;
     private EmploymentCheckRequest request = null!;
     private EmploymentCheckResult result = null!;
@@ -22,7 +22,7 @@ public class EmploymentCheckCompletionServiceTests
     public void SetUp()
     {
         repository = new Mock<IEmploymentCheckRepository>(MockBehavior.Strict);
-        publisher = new Mock<IEmploymentVerificationPublisher>(MockBehavior.Strict);
+        publisher = new Mock<IMessagePublisher>(MockBehavior.Strict);
         var clock = new Mock<TimeProvider>();
         clock.Setup(x => x.GetUtcNow()).Returns(Now);
         service = new EmploymentCheckCompletionService(repository.Object, publisher.Object, clock.Object, NullLogger<EmploymentCheckCompletionService>.Instance);

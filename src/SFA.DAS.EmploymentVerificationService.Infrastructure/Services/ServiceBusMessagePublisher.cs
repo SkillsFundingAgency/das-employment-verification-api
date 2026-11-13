@@ -2,23 +2,21 @@ using SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
-using SFA.DAS.EmploymentVerificationService.Messages.Learner.Events;
 
 namespace SFA.DAS.EmploymentVerificationService.Infrastructure.Services;
 
-public sealed class EmploymentVerificationPublisher(ServiceBusSender sender) : IEmploymentVerificationPublisher
+public sealed class ServiceBusMessagePublisher(ServiceBusSender sender) : IMessagePublisher
 {
-    public Task PublishAsync(VerifyNotEmployedCompleted message, CancellationToken cancellationToken)
+    public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken)
+        where TMessage : class
     {
         var serviceBusMessage = new ServiceBusMessage(JsonSerializer.Serialize(message))
         {
-            ContentType = "application/json",
-            Subject = nameof(VerifyNotEmployedCompleted),
-            CorrelationId = message.CorrelationId.ToString()
+            ContentType = "application/json"
         };
 
         serviceBusMessage.ApplicationProperties[ServiceBusMessageHeaders.EnclosedMessageTypes] =
-            typeof(VerifyNotEmployedCompleted).AssemblyQualifiedName!;
+            typeof(TMessage).AssemblyQualifiedName!;
 
         return sender.SendMessageAsync(serviceBusMessage, cancellationToken);
     }

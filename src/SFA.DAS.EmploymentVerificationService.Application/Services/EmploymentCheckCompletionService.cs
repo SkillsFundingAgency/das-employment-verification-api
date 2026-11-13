@@ -7,7 +7,7 @@ namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 
 public sealed class EmploymentCheckCompletionService(
     IEmploymentCheckRepository repository,
-    IEmploymentVerificationPublisher publisher,
+    IMessagePublisher publisher,
     TimeProvider timeProvider,
     ILogger<EmploymentCheckCompletionService> logger) : IEmploymentCheckCompletionService
 {

@@ -169,8 +169,8 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
         var message = JsonSerializer.Deserialize<VerifyNotEmployedCompleted>(sent.Body.ToString())!;
         Assert.Multiple(() =>
         {
-            Assert.That(sent.Subject, Is.EqualTo(nameof(VerifyNotEmployedCompleted)));
-            Assert.That(sent.CorrelationId, Is.EqualTo(scenario.Command.CorrelationId.ToString()));
+            Assert.That(sent.Subject, Is.Null);
+            Assert.That(sent.CorrelationId, Is.Null);
             Assert.That(message.CorrelationId, Is.EqualTo(scenario.Command.CorrelationId));
             Assert.That(message.ULN, Is.EqualTo(scenario.Command.ULN));
             Assert.That(message.EmployerAccountIdentifier, Is.EqualTo(scenario.Command.EmployerAccountIdentifier));
