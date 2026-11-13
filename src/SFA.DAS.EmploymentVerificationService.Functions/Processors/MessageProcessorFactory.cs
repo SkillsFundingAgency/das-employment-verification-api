@@ -1,6 +1,5 @@
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using SFA.DAS.EmploymentCheck.Types;
 using SFA.DAS.EmploymentVerificationService.Infrastructure.Messaging;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
@@ -18,20 +17,14 @@ public sealed class MessageProcessorFactory : IMessageProcessorFactory
         });
 
     private readonly IServiceProvider serviceProvider;
-    private readonly ILogger<MessageProcessorFactory> logger;
 
-    public MessageProcessorFactory(IServiceProvider serviceProvider, ILogger<MessageProcessorFactory> logger)
+    public MessageProcessorFactory(IServiceProvider serviceProvider)
     {
         this.serviceProvider = serviceProvider;
-        this.logger = logger;
     }
 
-    public async Task ProcessAsync(
-        ServiceBusReceivedMessage message,
-        CancellationToken cancellationToken)
+    public IMessageProcessor GetProcessor(ServiceBusReceivedMessage message)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         if (!message.ApplicationProperties.TryGetValue(
                 ServiceBusMessageHeaders.EnclosedMessageTypes,
                 out var metadata))
@@ -60,11 +53,6 @@ public sealed class MessageProcessorFactory : IMessageProcessorFactory
         if (processorType is null)
             throw new InvalidOperationException("No supported message type was found in the metadata.");
 
-        logger.LogInformation(
-            "Processing {MessageType}, MessageId {MessageId}",
-            selectedType, message.MessageId);
-
-        var processor = (IMessageProcessor)serviceProvider.GetRequiredService(processorType);
-        await processor.ProcessAsync(message.Body, cancellationToken);
+        return (IMessageProcessor)serviceProvider.GetRequiredService(processorType);
     }
 }

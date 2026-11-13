@@ -4,5 +4,5 @@ namespace SFA.DAS.EmploymentVerificationService.Functions.Processors;
 
 public interface IMessageProcessorFactory
 {
-    Task ProcessAsync(ServiceBusReceivedMessage message, CancellationToken cancellationToken);
+    IMessageProcessor GetProcessor(ServiceBusReceivedMessage message);
 }

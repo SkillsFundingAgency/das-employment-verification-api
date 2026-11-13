@@ -10,5 +10,9 @@ public class EmploymentVerificationServiceBusTrigger(IMessageProcessorFactory fa
     public Task Run(
         [ServiceBusTrigger("%EvsQueueName%", Connection = "DasSharedServiceBusConnection", AutoCompleteMessages = true)]
         ServiceBusReceivedMessage message,
-        CancellationToken cancellationToken) => factory.ProcessAsync(message, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var processor = factory.GetProcessor(message);
+        return processor.ProcessAsync(message.Body, cancellationToken);
+    }
 }
