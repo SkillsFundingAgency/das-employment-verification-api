@@ -57,12 +57,13 @@
   <ItemGroup>
     <Folder Include="PostDeployment" />
     <Folder Include="Properties" />
-    <Folder Include="Schemas" />
     <Folder Include="Stored Procedures" />
     <Folder Include="Tables" />
+    <Folder Include="EVS" />
+    <Folder Include="EVS\Schemas" />
+    <Folder Include="EVS\Tables" />
   </ItemGroup>
   <ItemGroup>
-    <Build Include="Schemas\EVS.sql" />
     <Build Include="Stored Procedures\usp_LogError.sql" />
     <Build Include="Stored Procedures\usp_LogETLCounts.sql" />
     <Build Include="Stored Procedures\usp_UpsertLogETLJob.sql" />
@@ -80,6 +81,14 @@
     <Build Include="Tables\PaymentStatus.sql" />
     <Build Include="Tables\ScheduledEmploymentVerification.sql" />
     <Build Include="Tables\stg_ScheduledEmploymentVerification.sql" />
+    <Build Include="EVS\Schemas\EVS.sql" />
+    <Build Include="EVS\Tables\EVS.EmploymentVerification.sql" />
+    <Build Include="EVS\Tables\EVS.VerificationType.sql" />
+    <Build Include="EVS\Tables\EVS.VerificationStatus.sql" />
+    <Build Include="EVS\Tables\EVS.LearnerEmploymentCheck.sql" />
+    <Build Include="EVS\Tables\EVS.LearnerEmploymentVerification.sql" />
+    <Build Include="EVS\Tables\EVS.EmploymentCheck.sql" />
+    <Build Include="EVS\Tables\EVS.EmploymentCheckStatus.sql" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Condition="'$(NetCoreBuild)' == 'true'">

@@ -5,3 +5,5 @@ public sealed record EmploymentCheckCompletion(
     bool Employed,
     byte UpdatedStatus,
     DateTime CreatedOn);
+
+
