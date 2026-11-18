@@ -10,5 +10,6 @@
         public DateTime RequestTime { get; set; }
         public DateTime ResponseTime { get; set; }
         public string? FailureReason { get; set; }
+        public EmploymentCheckStatus Status { get; set; }
     }
 }

@@ -16,7 +16,8 @@ public class LearnerEmploymentVerificationConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.EmployerAccountId).HasColumnType("bigint").IsRequired();
         builder.HasOne(x => x.Detail)
             .WithOne()
-            .HasForeignKey<EmploymentVerification>(x => x.Id);
+            .HasForeignKey<LearnerEmploymentVerification>(x => x.EmploymentVerificationId)
+            .IsRequired();
         builder.HasMany(x => x.LearnerEmploymentChecks)
             .WithOne()
             .HasForeignKey(x => x.LearnerEmploymentVerificationId);

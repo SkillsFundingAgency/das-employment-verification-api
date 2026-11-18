@@ -17,7 +17,7 @@ public class LearnerEmploymentCheckConfiguration : IEntityTypeConfiguration<Lear
         builder.Property(x => x.EmployerAccountId).HasColumnType("bigint").IsRequired();
         builder.HasOne(x => x.Detail)
             .WithOne()
-            .HasForeignKey<EmploymentVerification>(x => x.Id);
+            .HasForeignKey<LearnerEmploymentCheck>(x => x.EmploymentCheckId)
+            .IsRequired();
     }
-
 }
