@@ -5,11 +5,10 @@
 	[StartDate] DATE NOT NULL,
 	[EndDate] DATE NOT NULL,
 	[Reference] VARCHAR(200) NULL,
-	[RequestDate] DATETIME2(7) NOT NULL ,
-	[ResponseDate] DATETIME2(7) NULL,
+	[RequestTime] DATETIME2(7) NOT NULL ,
+	[ResponseTime] DATETIME2(7) NULL,
 	[Status] TINYINT NOT NULL CONSTRAINT FK_EmploymentCheck_EmploymentCheckStatus FOREIGN KEY REFERENCES EVS.EmploymentCheckStatus(Id),
-	[CompletionDate] DATETIME2(7) NULL,
 	[FailureReason] VARCHAR(200) NULL,
-	[CreationDate] DATETIME2(7) NOT NULL CONSTRAINT DF_EmploymentCheck_CreationDate DEFAULT GETDATE(),
+	[CreationTime] DATETIME2(7) NOT NULL CONSTRAINT DF_EmploymentCheck_CreationTime DEFAULT GETDATE(),
 );
 GO

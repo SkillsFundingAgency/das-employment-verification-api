@@ -24,4 +24,6 @@ public class EmploymentVerificationRequestConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.Status).HasColumnType("tinyint").IsRequired();
         builder.Property(x => x.CreatedOn).HasColumnType("datetime2").HasPrecision(7).IsRequired();
     }
+
+
 }

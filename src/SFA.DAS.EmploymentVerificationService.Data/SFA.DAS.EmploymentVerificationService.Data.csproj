@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../SFA.DAS.EmploymentVerificationService.Application/SFA.DAS.EmploymentVerificationService.Application.csproj" />
+    <ProjectReference Include="..\SFA.DAS.EmploymentVerificationService.Models\SFA.DAS.EmploymentVerificationService.Models.csproj" />
   </ItemGroup>
 </Project>
