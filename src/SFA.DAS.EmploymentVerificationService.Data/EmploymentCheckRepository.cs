@@ -7,11 +7,11 @@ namespace SFA.DAS.EmploymentVerificationService.Data;
 
 public class EmploymentCheckRepository(EmploymentVerificationDbContext context) : IEmploymentCheckRepository
 {
-    public Task<bool> ExistsAsync(Guid correlationId, CancellationToken cancellationToken)
+    public Task<bool> VerificationExists(Guid externalCorrelationId, CancellationToken cancellationToken)
     {
-        return context.EmploymentVerificationRequests
+        return context.LearnerEmploymentVerifications
             .AsNoTracking()
-            .AnyAsync(x => x.CorrelationId == correlationId, cancellationToken);
+            .AnyAsync(x => x.Detail.ExternalCorrelationId == externalCorrelationId, cancellationToken);
     }
 
     public async Task SaveRequestAsync(EmploymentCheckRequest request, CancellationToken cancellationToken)

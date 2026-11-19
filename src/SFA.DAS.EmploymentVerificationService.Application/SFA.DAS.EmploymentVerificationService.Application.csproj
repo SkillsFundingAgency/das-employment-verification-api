@@ -8,5 +8,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
     <ProjectReference Include="../SFA.DAS.EmploymentVerificationService.Messages/SFA.DAS.EmploymentVerificationService.Messages.csproj" />
+    <ProjectReference Include="..\SFA.DAS.EmploymentVerificationService.Models\SFA.DAS.EmploymentVerificationService.Models.csproj" />
   </ItemGroup>
 </Project>
