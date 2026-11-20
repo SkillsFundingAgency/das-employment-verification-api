@@ -20,5 +20,6 @@ public class EmploymentVerificationConfiguration : IEntityTypeConfiguration<Empl
         builder.Property(x => x.FailureReason).HasColumnType("nvarchar(200)").IsRequired(false);
         builder.Property(x => x.RetryCount).HasColumnType("tinyint").IsRequired();
         builder.Property(x => x.NextRetryTime).HasColumnType("datetime2").HasPrecision(7).IsRequired(false);
+        builder.Property(x => x.CreationTime).HasColumnType("datetime2").HasPrecision(7).HasDefaultValueSql("GETDATE()").IsRequired();
     }
 }

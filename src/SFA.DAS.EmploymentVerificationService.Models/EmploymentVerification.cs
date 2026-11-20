@@ -11,10 +11,11 @@ namespace SFA.DAS.EmploymentVerificationService.Models
         public Guid ExternalCorrelationId { get; set; }
         public DateOnly StartDate { get; set; }
         public int DurationInDays { get; set; }
-        public string Reference { get; set; }
+        public string? Reference { get; set; }
         public EmploymentVerificationStatus Status { get; set; }
-        public string FailureReason { get; set; }
+        public string? FailureReason { get; set; }
         public byte RetryCount { get; set; }
         public DateTime? NextRetryTime { get; set; }
+        public DateTime CreationTime { get; set; }
     }
 }
