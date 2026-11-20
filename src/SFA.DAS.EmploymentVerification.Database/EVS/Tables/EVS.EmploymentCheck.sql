@@ -1,6 +1,6 @@
 ﻿CREATE TABLE [EVS].[EmploymentCheck]
 (
-	[Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT PK_EmploymentCheck PRIMARY KEY,
+	[Id] BIGINT NOT NULL IDENTITY(1,1) CONSTRAINT PK_EmploymentCheck PRIMARY KEY,
 	[CheckCorrelationId] UNIQUEIDENTIFIER NOT NULL CONSTRAINT UC_EmploymentCheck_CheckCorrelationId UNIQUE,
 	[StartDate] DATE NOT NULL,
 	[EndDate] DATE NOT NULL,
