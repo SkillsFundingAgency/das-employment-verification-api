@@ -11,6 +11,17 @@ Post-Deployment Script Template
 */
 SET NOCOUNT ON;
 GO
+
+-- Lookup rows required by the initial VerifyNotEmployed request
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationType] WHERE [Id] = 1)
+    INSERT INTO [EVS].[VerificationType] ([Id], [Description]) VALUES (1, 'NonEmployment');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationStatus] WHERE [Id] = 2)
+    INSERT INTO [EVS].[VerificationStatus] ([Id], [Description]) VALUES (2, 'InProgress');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[EmploymentCheckStatus] WHERE [Id] = 1)
+    INSERT INTO [EVS].[EmploymentCheckStatus] ([Id], [Description]) VALUES (1, 'InProgress');
+GO
 --Insert data into CheckType table
 IF NOT EXISTS (SELECT 1 FROM [dbo].[CheckType])
 INSERT INTO [dbo].[CheckType] (CheckTypeId, CheckType)
