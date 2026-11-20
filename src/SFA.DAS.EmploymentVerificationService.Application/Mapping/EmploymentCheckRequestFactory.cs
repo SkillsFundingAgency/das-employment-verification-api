@@ -5,16 +5,16 @@ namespace SFA.DAS.EmploymentVerificationService.Application.Mapping;
 
 public sealed class EmploymentCheckRequestFactory(TimeProvider timeProvider)
 {
-    public EmploymentCheckRequest Create(VerifyNotEmployed command)
+    public EmploymentCheckRequest Create(VerifyNotEmployed command, Guid checkCorrelationId, int durationInDays)
     {
         return new EmploymentCheckRequest(
-            command.CorrelationId,
+            checkCorrelationId,
             command.ULN,
             command.EmployerAccountIdentifier,
             command.ApprenticeshipId,
             command.Reference,
             command.StartDate,
-            command.StartDate.AddDays(command.DurationInDays ?? 60),
+            command.StartDate.AddDays(durationInDays),
             1,
             (byte)EmploymentCheckStatus.InProgress,
             timeProvider.GetUtcNow().UtcDateTime);

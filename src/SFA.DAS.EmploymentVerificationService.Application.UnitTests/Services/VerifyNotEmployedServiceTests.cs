@@ -6,6 +6,8 @@ using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Application.Persistence;
 using SFA.DAS.EmploymentVerificationService.Application.Services;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Commands;
+using SFA.DAS.EmploymentVerificationService.Models;
+using CheckStatus = SFA.DAS.EmploymentVerificationService.Application.Models.EmploymentCheckStatus;
 
 namespace SFA.DAS.EmploymentVerificationService.Application.UnitTests.Services;
 
@@ -39,20 +41,21 @@ public class VerifyNotEmployedServiceTests
         };
     }
 
-    [Test]
-    public async Task ProcessAsync_SavesNewRequestBeforeSendingSameRequest()
+    [TestCase(0, 30)]
+    [TestCase(15, 15)]
+    public async Task ProcessAsync_SavesVerificationAndCheckBeforeSending(int duration, int expectedDuration)
     {
         // Arrange
-        var expected = factory.Create(command);
-        EmploymentCheckRequest? saved = null;
+        command.DurationInDays = duration;
+        LearnerEmploymentVerification? saved = null;
+        EmploymentCheckRequest? sent = null;
         var saveCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        repository.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
-        repository.Setup(x => x.SaveRequestAsync(expected, CancellationToken.None))
-            .Callback<EmploymentCheckRequest, CancellationToken>((request, _) => saved = request)
+        repository.Setup(x => x.VerificationExists(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
+        repository.Setup(x => x.SaveVerificationAsync(It.IsAny<LearnerEmploymentVerification>(), CancellationToken.None))
+            .Callback<LearnerEmploymentVerification, CancellationToken>((verification, _) => saved = verification)
             .Returns(saveCompleted.Task);
-        client.Setup(x => x.SendAsync(expected, CancellationToken.None))
-            .Callback<EmploymentCheckRequest, CancellationToken>((request, _) =>
-                Assert.That(request, Is.SameAs(saved)))
+        client.Setup(x => x.SendAsync(It.IsAny<EmploymentCheckRequest>(), CancellationToken.None))
+            .Callback<EmploymentCheckRequest, CancellationToken>((request, _) => sent = request)
             .Returns(Task.CompletedTask);
 
         // Act
@@ -63,18 +66,43 @@ public class VerifyNotEmployedServiceTests
         saveCompleted.SetResult();
         await processing;
 
-        repository.Verify(x => x.SaveRequestAsync(expected, CancellationToken.None), Times.Once);
-        client.Verify(x => x.SendAsync(expected, CancellationToken.None), Times.Once);
+        repository.Verify(x => x.SaveVerificationAsync(It.IsAny<LearnerEmploymentVerification>(), CancellationToken.None), Times.Once);
+        client.Verify(x => x.SendAsync(It.IsAny<EmploymentCheckRequest>(), CancellationToken.None), Times.Once);
+        var verification = saved!;
+        var link = verification.LearnerEmploymentChecks.Single();
+        var check = link.Detail;
+        Assert.Multiple(() =>
+        {
+            Assert.That(verification.Detail.ExternalCorrelationId, Is.EqualTo(command.CorrelationId));
+            Assert.That(verification.Detail.Type, Is.EqualTo(EmploymentVerificationType.NonEmployment));
+            Assert.That(verification.Detail.Status, Is.EqualTo(EmploymentVerificationStatus.InProgress));
+            Assert.That(verification.Detail.StartDate, Is.EqualTo(DateOnly.FromDateTime(command.StartDate)));
+            Assert.That(verification.Detail.DurationInDays, Is.EqualTo(expectedDuration));
+            Assert.That(verification.Detail.Reference, Is.EqualTo(command.Reference));
+            Assert.That(verification.UniqueLearnerNumber, Is.EqualTo(command.ULN));
+            Assert.That(verification.EmployerAccountId, Is.EqualTo(command.EmployerAccountIdentifier));
+            Assert.That(verification.ApprenticeshipId, Is.EqualTo(command.ApprenticeshipId));
+            Assert.That(link.UniqueLearnerNumber, Is.EqualTo(command.ULN));
+            Assert.That(link.EmployerAccountId, Is.EqualTo(command.EmployerAccountIdentifier));
+            Assert.That(check.CheckCorrelationId, Is.Not.EqualTo(command.CorrelationId).And.Not.EqualTo(Guid.Empty));
+            Assert.That(sent!.CorrelationId, Is.EqualTo(check.CheckCorrelationId));
+            Assert.That(sent.EndDate, Is.EqualTo(command.StartDate.AddDays(expectedDuration)));
+            Assert.That(check.StartDate, Is.EqualTo(verification.Detail.StartDate));
+            Assert.That(check.EndDate, Is.EqualTo(DateOnly.FromDateTime(sent.EndDate)));
+            Assert.That(check.Reference, Is.EqualTo(command.Reference));
+            Assert.That(check.RequestTime, Is.EqualTo(sent.CreatedOn));
+            Assert.That(check.Status, Is.EqualTo((byte)CheckStatus.InProgress));
+        });
     }
 
     [Test]
     public async Task ProcessAsync_IgnoresExistingRequest()
     {
-        repository.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(true);
+        repository.Setup(x => x.VerificationExists(command.CorrelationId, CancellationToken.None)).ReturnsAsync(true);
 
         await service.ProcessAsync(command, CancellationToken.None);
 
-        repository.Verify(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None), Times.Once);
+        repository.Verify(x => x.VerificationExists(command.CorrelationId, CancellationToken.None), Times.Once);
         repository.VerifyNoOtherCalls();
         client.VerifyNoOtherCalls();
     }
@@ -85,10 +113,9 @@ public class VerifyNotEmployedServiceTests
         // Arrange
         using var source = new CancellationTokenSource();
         var token = source.Token;
-        var expected = factory.Create(command);
-        repository.Setup(x => x.ExistsAsync(command.CorrelationId, token)).ReturnsAsync(false);
-        repository.Setup(x => x.SaveRequestAsync(expected, token)).Returns(Task.CompletedTask);
-        client.Setup(x => x.SendAsync(expected, token)).Returns(Task.CompletedTask);
+        repository.Setup(x => x.VerificationExists(command.CorrelationId, token)).ReturnsAsync(false);
+        repository.Setup(x => x.SaveVerificationAsync(It.IsAny<LearnerEmploymentVerification>(), token)).Returns(Task.CompletedTask);
+        client.Setup(x => x.SendAsync(It.IsAny<EmploymentCheckRequest>(), token)).Returns(Task.CompletedTask);
 
         // Act
         await service.ProcessAsync(command, token);
@@ -115,8 +142,8 @@ public class VerifyNotEmployedServiceTests
     {
         // Arrange
         var failure = new InvalidOperationException("Save failed");
-        repository.Setup(x => x.ExistsAsync(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
-        repository.Setup(x => x.SaveRequestAsync(factory.Create(command), CancellationToken.None)).ThrowsAsync(failure);
+        repository.Setup(x => x.VerificationExists(command.CorrelationId, CancellationToken.None)).ReturnsAsync(false);
+        repository.Setup(x => x.SaveVerificationAsync(It.IsAny<LearnerEmploymentVerification>(), CancellationToken.None)).ThrowsAsync(failure);
 
         // Act and Assert
         var thrown = Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(command, CancellationToken.None));

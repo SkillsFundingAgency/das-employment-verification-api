@@ -21,25 +21,46 @@ public sealed class VerifyNotEmployedService(
             logger.LogInformation("Existing request ignored for {CorrelationId}", command.CorrelationId);
             return;
         }
-        
-        var employmentVerification = new LearnerEmploymentVerification { 
-            Detail = new EmploymentVerification { 
-                ExternalCorrelationId = command.CorrelationId ,
-                StartDate = DateOnly.FromDateTime(command.StartDate),
-                DurationInDays = command.DurationInDays,
+
+        var durationInDays = command.DurationInDays == 0 ? 30 : command.DurationInDays;
+        var request = requestFactory.Create(command, Guid.NewGuid(), durationInDays);
+        var startDate = DateOnly.FromDateTime(request.StartDate);
+        var verification = new LearnerEmploymentVerification
+        {
+            Detail = new EmploymentVerification
+            {
+                ExternalCorrelationId = command.CorrelationId,
+                StartDate = startDate,
+                DurationInDays = durationInDays,
                 Reference = command.Reference,
                 Type = EmploymentVerificationType.NonEmployment,
-                Status = EmploymentVerificationStatus.InProgress,             
+                Status = EmploymentVerificationStatus.InProgress
             },
+            UniqueLearnerNumber = command.ULN,
+            EmployerAccountId = command.EmployerAccountIdentifier,
+            ApprenticeshipId = command.ApprenticeshipId,
+            LearnerEmploymentChecks =
+            [
+                new LearnerEmploymentCheck
+                {
+                    UniqueLearnerNumber = command.ULN,
+                    EmployerAccountId = command.EmployerAccountIdentifier,
+                    Detail = new EmploymentCheck
+                    {
+                        CheckCorrelationId = request.CorrelationId,
+                        StartDate = startDate,
+                        EndDate = DateOnly.FromDateTime(request.EndDate),
+                        Reference = request.Reference,
+                        RequestTime = request.CreatedOn,
+                        Status = request.Status
+                    }
+                }
+            ]
         };
 
-        //TODO: save the employmentVerification to the database here
-        //TODO: now trigger the employment check API call here
-
-
-        //await repository.SaveRequestAsync(request, cancellationToken);
-        //logger.LogInformation("New request persisted for {CorrelationId}", command.CorrelationId);
-        //await client.SendAsync(request, cancellationToken);
+        await repository.SaveVerificationAsync(verification, cancellationToken);
+        logger.LogInformation("New request persisted for {CorrelationId}", command.CorrelationId);
+        await client.SendAsync(request, cancellationToken);
         logger.LogInformation("Employment Check API submission completed for {CorrelationId}", command.CorrelationId);
     }
 }

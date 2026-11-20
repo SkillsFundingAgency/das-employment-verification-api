@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Application.Persistence;
 using SFA.DAS.EmploymentVerificationService.Data.Entities;
+using SFA.DAS.EmploymentVerificationService.Models;
 
 namespace SFA.DAS.EmploymentVerificationService.Data;
 
@@ -12,6 +13,12 @@ public class EmploymentCheckRepository(EmploymentVerificationDbContext context) 
         return context.LearnerEmploymentVerifications
             .AsNoTracking()
             .AnyAsync(x => x.Detail.ExternalCorrelationId == externalCorrelationId, cancellationToken);
+    }
+
+    public async Task SaveVerificationAsync(LearnerEmploymentVerification verification, CancellationToken cancellationToken)
+    {
+        context.LearnerEmploymentVerifications.Add(verification);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SaveRequestAsync(EmploymentCheckRequest request, CancellationToken cancellationToken)

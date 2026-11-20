@@ -20,9 +20,9 @@ public class EmploymentCheckRequestFactoryTests
         factory = new EmploymentCheckRequestFactory(clock.Object);
     }
 
-    [TestCase(15, 15)]
-    [TestCase(null, 60)]
-    public void Create_UsesExplicitDurationOrSixtyDayDefault(int? duration, int expectedDays)
+    [TestCase(15)]
+    [TestCase(30)]
+    public void Create_UsesEffectiveDuration(int duration)
     {
         // Arrange
         var command = new VerifyNotEmployed
@@ -32,13 +32,13 @@ public class EmploymentCheckRequestFactoryTests
         };
 
         // Act
-        var request = factory.Create(command);
+        var request = factory.Create(command, Guid.NewGuid(), duration);
 
         // Assert
         Assert.Multiple(() =>
         {
             Assert.That(request.StartDate, Is.EqualTo(command.StartDate));
-            Assert.That(request.EndDate, Is.EqualTo(command.StartDate.AddDays(expectedDays)));
+            Assert.That(request.EndDate, Is.EqualTo(command.StartDate.AddDays(duration)));
         });
     }
 
@@ -46,7 +46,7 @@ public class EmploymentCheckRequestFactoryTests
     public void Create_SetsInitialStatusAndAttemptCount()
     {
         // Act
-        var request = factory.Create(new VerifyNotEmployed());
+        var request = factory.Create(new VerifyNotEmployed(), Guid.NewGuid(), 30);
 
         // Assert
         Assert.Multiple(() =>
@@ -57,8 +57,8 @@ public class EmploymentCheckRequestFactoryTests
     }
 
     [TestCase(12345L, "reference")]
-    [TestCase(null, null)]
-    public void Create_MapsIdentifiersAndReference(long? apprenticeshipId, string? reference)
+    [TestCase(0L, null)]
+    public void Create_MapsIdentifiersAndReference(long apprenticeshipId, string? reference)
     {
         // Arrange
         var command = new VerifyNotEmployed
@@ -71,12 +71,13 @@ public class EmploymentCheckRequestFactoryTests
         };
 
         // Act
-        var request = factory.Create(command);
+        var checkCorrelationId = Guid.NewGuid();
+        var request = factory.Create(command, checkCorrelationId, 30);
 
         // Assert
         Assert.Multiple(() =>
         {
-            Assert.That(request.CorrelationId, Is.EqualTo(command.CorrelationId));
+            Assert.That(request.CorrelationId, Is.EqualTo(checkCorrelationId));
             Assert.That(request.ULN, Is.EqualTo(command.ULN));
             Assert.That(request.EmployerAccountIdentifier, Is.EqualTo(command.EmployerAccountIdentifier));
             Assert.That(request.ApprenticeshipId, Is.EqualTo(apprenticeshipId));
@@ -88,7 +89,7 @@ public class EmploymentCheckRequestFactoryTests
     public void Create_UsesCurrentUtcTimeFromTimeProvider()
     {
         // Act
-        var request = factory.Create(new VerifyNotEmployed());
+        var request = factory.Create(new VerifyNotEmployed(), Guid.NewGuid(), 30);
 
         // Assert
         Assert.Multiple(() =>

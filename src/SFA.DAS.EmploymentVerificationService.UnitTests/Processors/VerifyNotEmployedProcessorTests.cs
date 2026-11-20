@@ -20,8 +20,8 @@ public class VerifyNotEmployedProcessorTests
     }
 
     [TestCase(30, 789L, "reference")]
-    [TestCase(null, null, null)]
-    public async Task ProcessAsync_ForwardsCommandAndCancellationToken(int? duration, long? apprenticeshipId, string? reference)
+    [TestCase(0, 789L, null)]
+    public async Task ProcessAsync_ForwardsCommandAndCancellationToken(int duration, long apprenticeshipId, string? reference)
     {
         // Arrange
         var command = new VerifyNotEmployed
