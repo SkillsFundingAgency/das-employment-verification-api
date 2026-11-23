@@ -21,6 +21,15 @@ IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationStatus] WHERE [Id] = 2)
 
 IF NOT EXISTS (SELECT 1 FROM [EVS].[EmploymentCheckStatus] WHERE [Id] = 1)
     INSERT INTO [EVS].[EmploymentCheckStatus] ([Id], [Description]) VALUES (1, 'InProgress');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[EmploymentCheckStatus] WHERE [Id] = 2)
+    INSERT INTO [EVS].[EmploymentCheckStatus] ([Id], [Description]) VALUES (2, 'Completed');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationStatus] WHERE [Id] = 7)
+    INSERT INTO [EVS].[VerificationStatus] ([Id], [Description]) VALUES (7, 'Employed');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationStatus] WHERE [Id] = 8)
+    INSERT INTO [EVS].[VerificationStatus] ([Id], [Description]) VALUES (8, 'NotEmployed');
 GO
 --Insert data into CheckType table
 IF NOT EXISTS (SELECT 1 FROM [dbo].[CheckType])
