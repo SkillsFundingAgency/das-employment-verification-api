@@ -32,8 +32,16 @@ public sealed class TestRunBindings(TestSession scenario)
                 var database = scenario.DataContext;
                 var correlationId = scenario.Command.CorrelationId;
                 await using var transaction = await database.Database.BeginTransactionAsync();
-                await database.EmploymentVerificationResponses.Where(response => response.CorrelationId == correlationId).ExecuteDeleteAsync();
-                await database.EmploymentVerificationRequests.Where(request => request.CorrelationId == correlationId).ExecuteDeleteAsync();
+                var verifications = database.LearnerEmploymentVerifications
+                    .Where(verification => verification.Detail.ExternalCorrelationId == correlationId);
+                var links = verifications.SelectMany(verification => verification.LearnerEmploymentChecks);
+                var checkIds = await links.Select(link => link.EmploymentCheckId).ToListAsync();
+                await database.LearnerEmploymentChecks.Where(link => checkIds.Contains(link.EmploymentCheckId)).ExecuteDeleteAsync();
+                await database.Set<SFA.DAS.EmploymentVerificationService.Models.EmploymentCheck>()
+                    .Where(check => checkIds.Contains(check.Id)).ExecuteDeleteAsync();
+                await verifications.ExecuteDeleteAsync();
+                await database.Set<SFA.DAS.EmploymentVerificationService.Models.EmploymentVerification>()
+                    .Where(verification => verification.ExternalCorrelationId == correlationId).ExecuteDeleteAsync();
                 await transaction.CommitAsync();
             }
         }

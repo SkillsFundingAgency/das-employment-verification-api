@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Application.Persistence;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Events;
+using SFA.DAS.EmploymentVerificationService.Models;
+using EmploymentCheckStatus = SFA.DAS.EmploymentVerificationService.Models.EmploymentCheckStatus;
 
 namespace SFA.DAS.EmploymentVerificationService.Application.Services;
 
@@ -15,8 +17,8 @@ public sealed class EmploymentCheckCompletionService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var request = await repository.GetRequestAsync(result.CorrelationId, cancellationToken);
-        if (request is null)
+        var verification = await repository.GetVerificationForCheckAsync(result.CorrelationId, cancellationToken);
+        if (verification is null)
         {
             logger.LogWarning("No matching request found for {CorrelationId}", result.CorrelationId);
             return;
@@ -27,19 +29,23 @@ public sealed class EmploymentCheckCompletionService(
             throw new InvalidOperationException("Employment check failure processing is not implemented.");
         }
 
-        await repository.RecordCompletionAsync(new EmploymentCheckCompletion(
-            request.CorrelationId,
-            employed,
-            (byte)EmploymentCheckStatus.Completed,
-            timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
+        var check = verification.LearnerEmploymentChecks
+            .Single(check => check.Detail.CheckCorrelationId == result.CorrelationId).Detail;
+        check.Status = (byte)EmploymentCheckStatus.Completed;
+        check.ResponseTime = timeProvider.GetUtcNow().UtcDateTime;
+        verification.Detail.Status = employed
+            ? EmploymentVerificationStatus.Employed
+            : EmploymentVerificationStatus.NotEmployed;
+
+        await repository.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Employment check result persisted for {CorrelationId}", result.CorrelationId);
 
         await publisher.PublishAsync(new VerifyNotEmployedCompleted
         {
-            CorrelationId = request.CorrelationId,
-            ULN = request.ULN,
-            ApprenticeshipId = request.ApprenticeshipId,
-            EmployerAccountIdentifier = request.EmployerAccountIdentifier,
+            CorrelationId = verification.Detail.ExternalCorrelationId,
+            ULN = verification.UniqueLearnerNumber,
+            ApprenticeshipId = verification.ApprenticeshipId,
+            EmployerAccountIdentifier = verification.EmployerAccountId,
             NotEmployed = !employed
         }, cancellationToken);
         logger.LogInformation("VerifyNotEmployedCompleted event published for {CorrelationId}", result.CorrelationId);

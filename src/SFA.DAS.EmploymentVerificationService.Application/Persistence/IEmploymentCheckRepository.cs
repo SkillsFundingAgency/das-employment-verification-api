@@ -8,6 +8,6 @@ public interface IEmploymentCheckRepository
     Task<bool> VerificationExists(Guid externalCorrelationId, CancellationToken cancellationToken);
     Task SaveVerificationAsync(LearnerEmploymentVerification verification, CancellationToken cancellationToken);
     Task SaveRequestAsync(EmploymentCheckRequest request, CancellationToken cancellationToken);
-    Task<EmploymentCheckRequest?> GetRequestAsync(Guid correlationId, CancellationToken cancellationToken);
-    Task RecordCompletionAsync(EmploymentCheckCompletion completion, CancellationToken cancellationToken);
+    Task<LearnerEmploymentVerification?> GetVerificationForCheckAsync(Guid checkCorrelationId, CancellationToken cancellationToken);
+    Task SaveChangesAsync(CancellationToken cancellationToken);
 }

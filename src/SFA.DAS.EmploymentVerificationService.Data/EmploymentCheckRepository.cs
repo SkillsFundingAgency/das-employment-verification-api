@@ -42,41 +42,18 @@ public class EmploymentCheckRepository(EmploymentVerificationDbContext context) 
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<EmploymentCheckRequest?> GetRequestAsync(Guid correlationId, CancellationToken cancellationToken)
+    public Task<LearnerEmploymentVerification?> GetVerificationForCheckAsync(Guid checkCorrelationId, CancellationToken cancellationToken)
     {
-        return context.EmploymentVerificationRequests
-            .AsNoTracking()
-            .Where(x => x.CorrelationId == correlationId)
-            .Select(x => new EmploymentCheckRequest(
-                x.CorrelationId,
-                x.ULN,
-                x.AccountId,
-                x.ApprenticeshipId,
-                x.Reference,
-                x.StartDate,
-                x.EndDate,
-                x.NumberOfAttempts,
-                x.Status,
-                x.CreatedOn))
-            .SingleOrDefaultAsync(cancellationToken);
+        return context.LearnerEmploymentVerifications
+            .AsTracking()
+            .Include(verification => verification.Detail)
+            .Include(verification => verification.LearnerEmploymentChecks
+                .Where(check => check.Detail.CheckCorrelationId == checkCorrelationId))
+                .ThenInclude(check => check.Detail)
+            .SingleOrDefaultAsync(verification => verification.LearnerEmploymentChecks
+                .Any(check => check.Detail.CheckCorrelationId == checkCorrelationId), cancellationToken);
     }
 
-    public async Task RecordCompletionAsync(EmploymentCheckCompletion completion, CancellationToken cancellationToken)
-    {
-        var request = await context.EmploymentVerificationRequests
-            .SingleOrDefaultAsync(x => x.CorrelationId == completion.CorrelationId, cancellationToken)
-            ?? throw new InvalidOperationException($"Employment check request '{completion.CorrelationId}' was not found.");
-
-        var response = new EmploymentVerificationResponse
-        {
-            CorrelationId = completion.CorrelationId,
-            Employed = completion.Employed,
-            CreatedOn = completion.CreatedOn
-        };
-
-        request.Status = completion.UpdatedStatus;
-        context.EmploymentVerificationResponses.Add(response);
-
-        await context.SaveChangesAsync(cancellationToken);
-    }
+    public Task SaveChangesAsync(CancellationToken cancellationToken) =>
+        context.SaveChangesAsync(cancellationToken);
 }

@@ -5,6 +5,8 @@ using Reqnroll;
 using SFA.DAS.EmploymentCheck.Types;
 using SFA.DAS.EmploymentVerificationService.Application.Models;
 using SFA.DAS.EmploymentVerificationService.Messages.Learner.Events;
+using SFA.DAS.EmploymentVerificationService.Models;
+using EmploymentCheckStatus = SFA.DAS.EmploymentVerificationService.Models.EmploymentCheckStatus;
 
 namespace SFA.DAS.EmploymentVerificationService.Specs.StepDefinitions;
 
@@ -18,7 +20,8 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     [Given("a VerifyNotEmployed check has been published by a consuming service")]
     public async Task PublishedRequest()
     {
-        requestWasNew = !await scenario.DataContext.EmploymentVerificationRequests.AnyAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
+        requestWasNew = !await scenario.DataContext.LearnerEmploymentVerifications
+            .AnyAsync(verification => verification.Detail.ExternalCorrelationId == scenario.Command.CorrelationId);
         Assert.That(requestWasNew, Is.True);
     }
 
@@ -34,15 +37,17 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     {
         // This condition is captured before the preceding When invokes the service.
         Assert.That(requestWasNew, Is.True);
-        Assert.That(await scenario.DataContext.EmploymentVerificationRequests.CountAsync(request => request.CorrelationId == scenario.Command.CorrelationId), Is.EqualTo(1));
+        Assert.That(await scenario.DataContext.LearnerEmploymentVerifications
+            .CountAsync(verification => verification.Detail.ExternalCorrelationId == scenario.Command.CorrelationId), Is.EqualTo(1));
     }
 
     [Given("the employment check result has been received from the Employment Check service")]
     public async Task ReceiveEmploymentCheckResult()
     {
         await ProcessCommand();
-        await InitialAttemptCount();
-        completion = new EmploymentCheckCompletedEvent(scenario.Command.CorrelationId, false, DateTime.UtcNow, "");
+        using var request = ReadSubmittedRequest();
+        var checkCorrelationId = request.RootElement.GetProperty("correlationId").GetGuid();
+        completion = new EmploymentCheckCompletedEvent(checkCorrelationId, false, DateTime.UtcNow, "");
     }
 
     [Given(@"^the employment check request has completed successfully \(no errors or exceptions\)$")]
@@ -82,58 +87,54 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     public async Task ResultMatchesRequest()
     {
         Assert.That(completion, Is.Not.Null);
-        var request = await scenario.DataContext.EmploymentVerificationRequests.AsNoTracking()
-            .SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
-        Assert.That(completion!.CorrelationId, Is.EqualTo(request.CorrelationId));
+        var verification = await LoadVerificationAsync();
+        Assert.That(completion!.CorrelationId, Is.EqualTo(verification.LearnerEmploymentChecks.Single().Detail.CheckCorrelationId));
+        Assert.That(completion.CorrelationId, Is.Not.EqualTo(verification.Detail.ExternalCorrelationId));
     }
 
-    [Then("the request details are stored in the EVS EmploymentVerificationRequest table with Request Status 'In Progress' and NumberOfAttempts '1'")]
+    [Then("the verification and its first check are stored as InProgress")]
     public async Task RequestIsInProgress()
     {
-        await AssertRequestStatus(EmploymentCheckStatus.InProgress);
-        await InitialAttemptCount();
-    }
-
-    [Then("status value stored in the EVS EmploymentVerificationRequest table is updated to 'Completed'")]
-    public Task RequestIsCompleted() => AssertRequestStatus(EmploymentCheckStatus.Completed);
-
-    private async Task AssertRequestStatus(EmploymentCheckStatus status)
-    {
-        var request = await scenario.DataContext.EmploymentVerificationRequests.AsNoTracking().SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
+        var verification = await LoadVerificationAsync();
+        var check = verification.LearnerEmploymentChecks.Single().Detail;
         Assert.Multiple(() =>
         {
-            Assert.That(request.CorrelationId, Is.EqualTo(scenario.Command.CorrelationId));
-            Assert.That(request.ULN, Is.EqualTo(scenario.Command.ULN));
-            Assert.That(request.AccountId, Is.EqualTo(scenario.Command.EmployerAccountIdentifier));
-            Assert.That(request.ApprenticeshipId, Is.EqualTo(scenario.Command.ApprenticeshipId));
-            Assert.That(request.Reference, Is.EqualTo(scenario.Command.Reference));
-            Assert.That(request.StartDate, Is.EqualTo(scenario.Command.StartDate));
-            Assert.That(request.EndDate, Is.EqualTo(scenario.Command.StartDate.AddDays(30)));
-            Assert.That(request.NumberOfFailures, Is.Zero);
-            Assert.That(request.Status, Is.EqualTo((byte)status));
+            Assert.That(verification.UniqueLearnerNumber, Is.EqualTo(scenario.Command.ULN));
+            Assert.That(verification.EmployerAccountId, Is.EqualTo(scenario.Command.EmployerAccountIdentifier));
+            Assert.That(verification.ApprenticeshipId, Is.EqualTo(scenario.Command.ApprenticeshipId));
+            Assert.That(verification.Detail.Reference, Is.EqualTo(scenario.Command.Reference));
+            Assert.That(verification.Detail.StartDate, Is.EqualTo(DateOnly.FromDateTime(scenario.Command.StartDate)));
+            Assert.That(verification.Detail.DurationInDays, Is.EqualTo(scenario.Command.DurationInDays));
+            Assert.That(verification.Detail.RetryCount, Is.Zero);
+            Assert.That(verification.Detail.Status, Is.EqualTo(EmploymentVerificationStatus.InProgress));
+            Assert.That(check.StartDate, Is.EqualTo(verification.Detail.StartDate));
+            Assert.That(check.EndDate, Is.EqualTo(verification.Detail.StartDate.AddDays(verification.Detail.DurationInDays)));
+            Assert.That(check.Status, Is.EqualTo((byte)EmploymentCheckStatus.InProgress));
         });
     }
 
-    [When("this is the first attempt for this verify request")]
-    public async Task InitialAttemptCount()
-    {
-        var request = await scenario.DataContext.EmploymentVerificationRequests.AsNoTracking().SingleAsync(request => request.CorrelationId == scenario.Command.CorrelationId);
-        Assert.That(request.NumberOfAttempts, Is.EqualTo(1));
-    }
+    private Task<LearnerEmploymentVerification> LoadVerificationAsync() =>
+        scenario.DataContext.LearnerEmploymentVerifications.AsNoTracking()
+            .Include(verification => verification.Detail)
+            .Include(verification => verification.LearnerEmploymentChecks).ThenInclude(check => check.Detail)
+            .SingleAsync(verification => verification.Detail.ExternalCorrelationId == scenario.Command.CorrelationId);
 
     [Then("EVS constructs the outgoing RegisterCheckRequest to the Employment Check service")]
-    public void RegisterCheckRequestWasConstructed()
+    public async Task RegisterCheckRequestWasConstructed()
     {
         var request = scenario.Api.LogEntries.Single().RequestMessage!;
         Assert.That(request.Path, Is.EqualTo("/api/EmploymentCheck/RegisterCheck"));
         Assert.That(request.Method, Is.EqualTo("POST"));
-        using var json = JsonDocument.Parse(request.Body!);
+        using var json = ReadSubmittedRequest();
         var body = json.RootElement;
+        var verification = await LoadVerificationAsync();
+        var check = verification.LearnerEmploymentChecks.Single().Detail;
         Assert.Multiple(() =>
         {
             Assert.That(body.EnumerateObject().Select(property => property.Name), Is.EquivalentTo(new[]
                 { "correlationId", "checkType", "uln", "apprenticeshipAccountId", "apprenticeshipId", "minDate", "maxDate" }));
-            Assert.That(body.GetProperty("correlationId").GetGuid(), Is.EqualTo(scenario.Command.CorrelationId));
+            Assert.That(body.GetProperty("correlationId").GetGuid(), Is.EqualTo(check.CheckCorrelationId)
+                .And.Not.EqualTo(scenario.Command.CorrelationId));
             Assert.That(body.GetProperty("checkType").GetString(), Is.EqualTo("VerifyNotEmployed"));
             Assert.That(body.GetProperty("uln").GetInt64(), Is.EqualTo(scenario.Command.ULN));
             Assert.That(body.GetProperty("apprenticeshipAccountId").GetInt32(), Is.EqualTo(scenario.Command.EmployerAccountIdentifier));
@@ -143,6 +144,9 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
         });
     }
 
+    private JsonDocument ReadSubmittedRequest() =>
+        JsonDocument.Parse(scenario.Api.LogEntries.Single().RequestMessage!.Body!);
+
     [Then("the request is submitted")]
     public void RequestWasSubmitted()
     {
@@ -151,14 +155,16 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
         Assert.That(scenario.Api.LogEntries.Single().ResponseMessage!.StatusCode, Is.EqualTo(200));
     }
 
-    [Then("^the result is stored in the EmploymentVerificationResponse table with Employed=(True|False)$")]
-    public async Task ResponseWasSaved(bool employed)
+    [Then("^the check is completed and the verification outcome is (Employed|NotEmployed)$")]
+    public async Task ResponseWasSaved(EmploymentVerificationStatus status)
     {
-        var response = await scenario.DataContext.EmploymentVerificationResponses.AsNoTracking().SingleAsync(response => response.CorrelationId == scenario.Command.CorrelationId);
+        var verification = await LoadVerificationAsync();
+        var check = verification.LearnerEmploymentChecks.Single().Detail;
         Assert.Multiple(() =>
         {
-            Assert.That(response.CorrelationId, Is.EqualTo(scenario.Command.CorrelationId));
-            Assert.That(response.Employed, Is.EqualTo(employed));
+            Assert.That(check.Status, Is.EqualTo((byte)EmploymentCheckStatus.Completed));
+            Assert.That(check.ResponseTime, Is.Not.Null);
+            Assert.That(verification.Detail.Status, Is.EqualTo(status));
         });
     }
 
