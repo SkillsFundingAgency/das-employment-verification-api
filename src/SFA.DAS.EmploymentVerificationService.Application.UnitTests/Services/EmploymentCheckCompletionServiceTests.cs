@@ -50,10 +50,11 @@ public class EmploymentCheckCompletionServiceTests
             new DateTime(2026, 3, 3, 12, 0, 0, DateTimeKind.Utc), null);
     }
 
-    [TestCase(false, true, EmploymentVerificationStatus.NotEmployed)]
-    [TestCase(true, false, EmploymentVerificationStatus.Employed)]
+    [TestCase(false, true, EmploymentCheckStatus.NotEmployed, EmploymentVerificationStatus.NotEmployed)]
+    [TestCase(true, false, EmploymentCheckStatus.Employed, EmploymentVerificationStatus.Employed)]
     public async Task ProcessAsync_RecordsResultAndPublishesMappedMessage(
-        bool employed, bool notEmployed, EmploymentVerificationStatus expectedStatus)
+        bool employed, bool notEmployed, EmploymentCheckStatus expectedCheckStatus,
+        EmploymentVerificationStatus expectedVerificationStatus)
     {
         // Arrange
         result = result with { EmploymentResult = employed };
@@ -61,8 +62,8 @@ public class EmploymentCheckCompletionServiceTests
         repository.Setup(x => x.SaveChangesAsync(CancellationToken.None))
             .Callback(() =>
             {
-                Assert.That(check.Status, Is.EqualTo((byte)EmploymentCheckStatus.Completed));
-                Assert.That(verification.Detail.Status, Is.EqualTo(expectedStatus));
+                Assert.That(check.Status, Is.EqualTo((byte)expectedCheckStatus));
+                Assert.That(verification.Detail.Status, Is.EqualTo(expectedVerificationStatus));
             })
             .Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishAsync(It.Is<VerifyNotEmployedCompleted>(message =>
@@ -188,17 +189,39 @@ public class EmploymentCheckCompletionServiceTests
     [TestCase(true, "error")]
     [TestCase(false, "error")]
     [TestCase(true, " ")]
-    public void ProcessAsync_RejectsUnsupportedFailureWithoutSavingOrPublishing(bool? employed, string? errorType)
+    public async Task ProcessAsync_RecordsCheckFailureWithoutChangingVerificationOrPublishing(bool? employed, string? errorType)
     {
         // Arrange
         result = result with { EmploymentResult = employed, ErrorType = errorType };
         repository.Setup(x => x.GetVerificationForCheckAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(verification);
+        repository.Setup(x => x.SaveChangesAsync(CancellationToken.None))
+            .Callback(() =>
+            {
+                Assert.That(check.Status, Is.EqualTo((byte)EmploymentCheckStatus.Failed));
+                Assert.That(check.FailureReason, Is.EqualTo(errorType));
+                Assert.That(check.ResponseTime, Is.EqualTo(Now.UtcDateTime));
+                Assert.That(verification.Detail.Status, Is.EqualTo(EmploymentVerificationStatus.InProgress));
+            })
+            .Returns(Task.CompletedTask);
 
-        // Act and Assert
-        Assert.ThrowsAsync<InvalidOperationException>(() => service.ProcessAsync(result, CancellationToken.None));
+        // Act
+        await service.ProcessAsync(result, CancellationToken.None);
 
-        repository.Verify(x => x.GetVerificationForCheckAsync(result.CorrelationId, CancellationToken.None), Times.Once);
-        repository.VerifyNoOtherCalls();
+        // Assert
+        repository.VerifyAll();
+        repository.Verify(x => x.SaveChangesAsync(CancellationToken.None), Times.Once);
         publisher.VerifyNoOtherCalls();
+    }
+
+    [Test]
+    public async Task ProcessAsync_TruncatesFailureReasonToColumnLength()
+    {
+        result = result with { ErrorType = new string('x', 200) + "extra" };
+        repository.Setup(x => x.GetVerificationForCheckAsync(result.CorrelationId, CancellationToken.None)).ReturnsAsync(verification);
+        repository.Setup(x => x.SaveChangesAsync(CancellationToken.None)).Returns(Task.CompletedTask);
+
+        await service.ProcessAsync(result, CancellationToken.None);
+
+        Assert.That(check.FailureReason, Is.EqualTo(new string('x', 200)));
     }
 }

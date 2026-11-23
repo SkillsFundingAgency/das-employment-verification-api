@@ -155,16 +155,16 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
         Assert.That(scenario.Api.LogEntries.Single().ResponseMessage!.StatusCode, Is.EqualTo(200));
     }
 
-    [Then("^the check is completed and the verification outcome is (Employed|NotEmployed)$")]
-    public async Task ResponseWasSaved(EmploymentVerificationStatus status)
+    [Then("^the check status is (Employed|NotEmployed) and the verification outcome is (Employed|NotEmployed)$")]
+    public async Task ResponseWasSaved(EmploymentCheckStatus checkStatus, EmploymentVerificationStatus verificationStatus)
     {
         var verification = await LoadVerificationAsync();
         var check = verification.LearnerEmploymentChecks.Single().Detail;
         Assert.Multiple(() =>
         {
-            Assert.That(check.Status, Is.EqualTo((byte)EmploymentCheckStatus.Completed));
+            Assert.That(check.Status, Is.EqualTo((byte)checkStatus));
             Assert.That(check.ResponseTime, Is.Not.Null);
-            Assert.That(verification.Detail.Status, Is.EqualTo(status));
+            Assert.That(verification.Detail.Status, Is.EqualTo(verificationStatus));
         });
     }
 

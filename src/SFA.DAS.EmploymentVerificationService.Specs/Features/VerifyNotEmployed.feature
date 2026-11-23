@@ -16,7 +16,7 @@ Feature: Verify that a learner is not employed
         And the result returns an employed = 'false' result (success response)
         When the result is processed
         And the result is matched to the verify request
-        Then the check is completed and the verification outcome is NotEmployed
+        Then the check status is NotEmployed and the verification outcome is NotEmployed
         And EVS publishes a VerifyNotEmployedCompleted message with NotEmployed=True
         And processing ends
 
@@ -26,5 +26,5 @@ Feature: Verify that a learner is not employed
         And the result returns employed = 'true' result (failure response)
         When the result is processed
         And the result is matched to the verify request
-        Then the check is completed and the verification outcome is Employed
+        Then the check status is Employed and the verification outcome is Employed
         And EVS publishes a VerifyNotEmployedCompleted message with NotEmployed=False

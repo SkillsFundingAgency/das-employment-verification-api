@@ -16,6 +16,7 @@ public sealed class EmploymentCheckCompletionService(
     public async Task ProcessAsync(EmploymentCheckResult result, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var responseTime = timeProvider.GetUtcNow().UtcDateTime;
 
         var verification = await repository.GetVerificationForCheckAsync(result.CorrelationId, cancellationToken);
         if (verification is null)
@@ -24,15 +25,24 @@ public sealed class EmploymentCheckCompletionService(
             return;
         }
 
-        if (result.EmploymentResult is not bool employed || !string.IsNullOrEmpty(result.ErrorType))
-        {
-            throw new InvalidOperationException("Employment check failure processing is not implemented.");
-        }
-
         var check = verification.LearnerEmploymentChecks
             .Single(check => check.Detail.CheckCorrelationId == result.CorrelationId).Detail;
-        check.Status = (byte)EmploymentCheckStatus.Completed;
-        check.ResponseTime = timeProvider.GetUtcNow().UtcDateTime;
+        check.ResponseTime = responseTime;
+
+        if (result.EmploymentResult is not bool employed || !string.IsNullOrEmpty(result.ErrorType))
+        {
+            const int maxFailureReasonLength = 200;
+            check.Status = (byte)EmploymentCheckStatus.Failed;
+            check.FailureReason = result.ErrorType is { Length: > maxFailureReasonLength } errorType
+                ? errorType[..maxFailureReasonLength]
+                : result.ErrorType;
+            await repository.SaveChangesAsync(cancellationToken);
+            logger.LogWarning("Employment check failure persisted for {CorrelationId}", result.CorrelationId);
+            return;
+        }
+
+        check.Status = (byte)(employed ? EmploymentCheckStatus.Employed : EmploymentCheckStatus.NotEmployed);
+        check.FailureReason = null;
         verification.Detail.Status = employed
             ? EmploymentVerificationStatus.Employed
             : EmploymentVerificationStatus.NotEmployed;
