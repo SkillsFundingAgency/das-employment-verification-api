@@ -92,7 +92,7 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
         Assert.That(completion.CorrelationId, Is.Not.EqualTo(verification.Detail.ExternalCorrelationId));
     }
 
-    [Then("the verification and its first check are stored as InProgress")]
+    [Then("the request details are stored in the EVS EmploymentVerification and EmploymentCheck tables with Status 'InProgress' and one initial check")]
     public async Task RequestIsInProgress()
     {
         var verification = await LoadVerificationAsync();
@@ -155,8 +155,15 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
         Assert.That(scenario.Api.LogEntries.Single().ResponseMessage!.StatusCode, Is.EqualTo(200));
     }
 
-    [Then("^the check status is (Employed|NotEmployed) and the verification outcome is (Employed|NotEmployed)$")]
-    public async Task ResponseWasSaved(EmploymentCheckStatus checkStatus, EmploymentVerificationStatus verificationStatus)
+    [Then("^the status value stored in the EVS EmploymentVerification table is updated to '(Employed|NotEmployed)'$")]
+    public async Task VerificationStatusWasUpdated(EmploymentVerificationStatus verificationStatus)
+    {
+        var verification = await LoadVerificationAsync();
+        Assert.That(verification.Detail.Status, Is.EqualTo(verificationStatus));
+    }
+
+    [Then("^the result is stored in the EmploymentCheck table with status '(Employed|NotEmployed)'$")]
+    public async Task CheckResultWasSaved(EmploymentCheckStatus checkStatus)
     {
         var verification = await LoadVerificationAsync();
         var check = verification.LearnerEmploymentChecks.Single().Detail;
@@ -164,7 +171,6 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
         {
             Assert.That(check.Status, Is.EqualTo((byte)checkStatus));
             Assert.That(check.ResponseTime, Is.Not.Null);
-            Assert.That(verification.Detail.Status, Is.EqualTo(verificationStatus));
         });
     }
 
