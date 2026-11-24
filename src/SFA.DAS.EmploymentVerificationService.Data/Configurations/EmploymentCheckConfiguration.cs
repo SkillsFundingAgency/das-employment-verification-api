@@ -14,7 +14,7 @@ public class EmploymentCheckConfiguration : IEntityTypeConfiguration<EmploymentC
         builder.Property(x => x.CheckCorrelationId).IsRequired();
         builder.Property(x => x.StartDate).HasColumnType("date").IsRequired();
         builder.Property(x => x.EndDate).HasColumnType("date").IsRequired();
-        builder.Property(x => x.Reference).HasColumnType("varchar(200)").IsRequired(false);
+        builder.Property(x => x.Reference).HasColumnType("nvarchar(max)").IsRequired(false);
         builder.Property(x => x.RequestTime).HasColumnType("datetime2").HasPrecision(7).IsRequired();
         builder.Property(x => x.ResponseTime).HasColumnType("datetime2").HasPrecision(7).IsRequired(false);
         builder.Property(x => x.FailureReason).HasColumnType("varchar(200)").IsRequired(false);

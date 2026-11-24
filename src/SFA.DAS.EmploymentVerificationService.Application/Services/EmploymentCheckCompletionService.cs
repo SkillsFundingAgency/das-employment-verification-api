@@ -29,7 +29,7 @@ public sealed class EmploymentCheckCompletionService(
             .Single(check => check.Detail.CheckCorrelationId == result.CorrelationId).Detail;
         check.ResponseTime = responseTime;
 
-        if (result.EmploymentResult is not bool employed || !string.IsNullOrEmpty(result.ErrorType))
+        if (result.EmploymentResult is not { } employed || !string.IsNullOrEmpty(result.ErrorType))
         {
             const int maxFailureReasonLength = 200;
             check.Status = (byte)EmploymentCheckStatus.Failed;
