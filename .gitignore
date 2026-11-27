@@ -351,3 +351,18 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+# Local SQL tooling caches and project backups
+.dacfx/
+*.sqlproj_backup
+
+# Test results and common coverage reports outside build directories
+*.trx
+coverage/
+CoverageResults/
+coverage*.xml
+coverage*.json
+lcov.info
+
+# Optional local acceptance-test configuration
+/tests/SFA.DAS.EmploymentVerificationService.Specs/appSettings.Development.json

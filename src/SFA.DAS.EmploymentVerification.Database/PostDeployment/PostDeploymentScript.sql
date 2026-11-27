@@ -11,6 +11,35 @@ Post-Deployment Script Template
 */
 SET NOCOUNT ON;
 GO
+
+-- Lookup rows required by the initial VerifyNotEmployed request
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationType] WHERE [Id] = 1)
+    INSERT INTO [EVS].[VerificationType] ([Id], [Description]) VALUES (1, 'NonEmployment');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationStatus] WHERE [Id] = 2)
+    INSERT INTO [EVS].[VerificationStatus] ([Id], [Description]) VALUES (2, 'InProgress');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[EmploymentCheckStatus] WHERE [Id] = 1)
+    INSERT INTO [EVS].[EmploymentCheckStatus] ([Id], [Description]) VALUES (1, 'InProgress');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[EmploymentCheckStatus] WHERE [Id] = 2)
+    INSERT INTO [EVS].[EmploymentCheckStatus] ([Id], [Description]) VALUES (2, 'Employed');
+ELSE
+    UPDATE [EVS].[EmploymentCheckStatus] SET [Description] = 'Employed'
+    WHERE [Id] = 2 AND [Description] <> 'Employed';
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[EmploymentCheckStatus] WHERE [Id] = 3)
+    INSERT INTO [EVS].[EmploymentCheckStatus] ([Id], [Description]) VALUES (3, 'NotEmployed');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[EmploymentCheckStatus] WHERE [Id] = 4)
+    INSERT INTO [EVS].[EmploymentCheckStatus] ([Id], [Description]) VALUES (4, 'Failed');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationStatus] WHERE [Id] = 7)
+    INSERT INTO [EVS].[VerificationStatus] ([Id], [Description]) VALUES (7, 'Employed');
+
+IF NOT EXISTS (SELECT 1 FROM [EVS].[VerificationStatus] WHERE [Id] = 8)
+    INSERT INTO [EVS].[VerificationStatus] ([Id], [Description]) VALUES (8, 'NotEmployed');
+GO
 --Insert data into CheckType table
 IF NOT EXISTS (SELECT 1 FROM [dbo].[CheckType])
 INSERT INTO [dbo].[CheckType] (CheckTypeId, CheckType)
