@@ -35,7 +35,6 @@ public sealed class VerifyNotEmployedSteps(TestSession scenario)
     [When("the same request has not been received previously")]
     public async Task RequestWasNotReceivedPreviously()
     {
-        // This condition is captured before the preceding When invokes the service.
         Assert.That(requestWasNew, Is.True);
         Assert.That(await scenario.DataContext.LearnerEmploymentVerifications
             .CountAsync(verification => verification.Detail.ExternalCorrelationId == scenario.Command.CorrelationId), Is.EqualTo(1));
