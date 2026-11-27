@@ -35,8 +35,14 @@ public sealed class EmploymentCheckClient(
         };
         if (!environment.IsDevelopment())
         {
+            var scope = configuration["EmploymentCheckApiScope"];
+            if (string.IsNullOrWhiteSpace(scope))
+            {
+                throw new InvalidOperationException("The EmploymentCheckApiScope setting is required for Employment Check API authentication.");
+            }
+
             var token = await credential.GetTokenAsync(
-                new TokenRequestContext([configuration["EmploymentCheckApiScope"]!]), cancellationToken);
+                new TokenRequestContext([scope]), cancellationToken);
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         }
 
